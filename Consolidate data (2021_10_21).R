@@ -5,6 +5,8 @@
 
 the_start <- Sys.time()
 
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # Download Yahoo fundamentals
 # SLOW!!! (over 5,000 tickers' worth of fundamentals)
@@ -82,7 +84,7 @@ simfin_income_statements_yearly <-
            operating_expenses = operating_expenses * -1,
            selling_general_administrative = selling_general_administrative * -1,
            research_development = research_development * -1)
-# fwrite(simfin_income_statements_yearly %>% filter(ticker == "UPS"), "simfin_income_statements_yearly.csv")
+
 
 simfin_balance_sheets_quarterly <- 
     read_tibble(simfin_bs_quarterly_file) %>% 
@@ -92,7 +94,7 @@ simfin_balance_sheets_yearly <-
     read_tibble(simfin_bs_yearly_file) %>% 
     add_column(form = "balance_sheet") %>% 
     add_column(source = "simfin")
-# fwrite(simfin_balance_sheets_yearly %>% filter(ticker == "UPS"), "simfin_balance_sheets_yearly.csv")
+
 simfin_cash_flow_statements_quarterly <- 
     read_tibble(simfin_cf_quarterly_file) %>% 
     add_column(form = "cash_flow_statement") %>% 
@@ -205,7 +207,7 @@ file_profiles <- list.files(dir_yh2, pattern = "profile_data", full.names = TRUE
 yhoo_profiles <- map(file_profiles, ~read_tibble(.x)) %>% bind_rows()
 
 # Save to this project's data directory
-fwrite(yhoo_profiles, paste0("cleaned data/yhoo_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(yhoo_profiles, paste0(dir_data, "cleaned data/yhoo_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(yhoo_profiles, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/yhoo_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -214,11 +216,11 @@ fwrite(yhoo_profiles, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-ana
 #-----------------------------------------------#
 # Part 4 - Factset data                         #
 # Only run if the raw Factset data is updated
-# source("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/Factset data/Clean Factset data.R")
+# source("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/Factset data/Clean Factset data.R")
 #-----------------------------------------------#
 
 # Read
-fs_yearly_file <- list.files("cleaned data", pattern = "fs_yearly", full.names = TRUE)
+fs_yearly_file <- list.files(paste0(dir_data, "cleaned data"), pattern = "fs_yearly", full.names = TRUE)
 fs_yearly <- read_tibble(fs_yearly_file)
 
 factset_balance_sheets_yearly <- 
@@ -307,7 +309,7 @@ edgar_profile_data <-
 
 
 # Save to this project's data directory
-fwrite(edgar_profile_data, paste0("cleaned data/edgar_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(edgar_profile_data, paste0(dir_data, "cleaned data/edgar_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(edgar_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/edgar_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -323,7 +325,7 @@ fwrite(edgar_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stoc
 library(tidyverse)
 library(data.table)
 
-dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/Input data"
+dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/Input data"
 input_data_file <- list.files(dir_r, pattern = "Input data\\.csv", full.names = TRUE) %>% max()
 input_data <- read_tibble(input_data_file, date_format = "%m/%d/%Y")
 
@@ -510,7 +512,7 @@ bs_consolidated <-
 stopifnot(!bs_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>% any())
 
 # Save to this project's data directory
-fwrite(bs_consolidated, paste0("cleaned data/bs_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(bs_consolidated, paste0(dir_data, "cleaned data/bs_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(bs_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/bs_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -634,7 +636,7 @@ stopifnot(!is_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>%
 
   
 # Save to this project's data directory
-fwrite(is_consolidated, paste0("cleaned data/is_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(is_consolidated, paste0(dir_data, "cleaned data/is_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(is_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/is_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -757,7 +759,7 @@ cf_consolidated <-
 stopifnot(!cf_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>% any())
 
 # Save to this project's data directory
-fwrite(cf_consolidated, paste0("cleaned data/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(cf_consolidated, paste0(dir_data, "cleaned data/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(cf_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -805,11 +807,11 @@ rm(list = ls()[!ls() %in% grep("start|end", ls(), value = TRUE)])
 
 # Profiles (ratios + industry, company names, etc.)
 
-file_edgar_profiles <- list.files("cleaned data", pattern = "edgar_profiles", full.names = TRUE)
+file_edgar_profiles <- list.files(paste0(dir_data, "cleaned data"), pattern = "edgar_profiles", full.names = TRUE)
 edgar_profile_data <- map(file_edgar_profiles, ~read_tibble(.x)) %>% bind_rows() %>% distinct()
 
 
-file_yhoo_profiles <- list.files("cleaned data", pattern = "yhoo_profiles", full.names = TRUE)
+file_yhoo_profiles <- list.files(paste0(dir_data, "cleaned data"), pattern = "yhoo_profiles", full.names = TRUE)
 
 yhoo_profile_data <- map(file_yhoo_profiles, ~read_tibble(.x)) %>% bind_rows() %>% distinct()
 
@@ -863,7 +865,7 @@ simfin_sector_industry_data <-
     mutate(across(c(sector, industry), ~snakecase::to_snake_case(.x)))
 
 # Save to this project's data directory
-fwrite(simfin_sector_industry_data, paste0("cleaned data/simfin_sector_industry_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(simfin_sector_industry_data, paste0(dir_data, "cleaned data/simfin_sector_industry_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(simfin_sector_industry_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/simfin_industry_sector_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -890,7 +892,7 @@ sector_industry_data <-
 
 
 # save to this project's data directory
-fwrite(sector_industry_data, paste0("cleaned data/sector_industry_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(sector_industry_data, paste0(dir_data, "cleaned data/sector_industry_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
@@ -907,16 +909,16 @@ source("helper functions.R")
 
 
 # Read data
-sector_industry_data_file <- list.files("cleaned data", pattern = "^sector_industry_data", full.names = TRUE) %>% max()
+sector_industry_data_file <- list.files(paste0(dir_data, "cleaned data"), pattern = "^sector_industry_data", full.names = TRUE) %>% max()
 sector_industry_data <- read_tibble(sector_industry_data_file) 
 
-bs_files <- list.files("cleaned data", pattern = "bs_consolidated", full.names = TRUE)
+bs_files <- list.files(paste0(dir_data, "cleaned data"), pattern = "bs_consolidated", full.names = TRUE)
 bs_consolidated <- map(bs_files %>% max(), ~read_tibble(.x)) %>% bind_rows()
 
-is_files <- list.files("cleaned data", pattern = "is_consolidated", full.names = TRUE)
+is_files <- list.files(paste0(dir_data, "cleaned data"), pattern = "is_consolidated", full.names = TRUE)
 is_consolidated <- map(is_files %>% max(), ~read_tibble(.x)) %>% bind_rows()
 
-cf_files <- list.files("cleaned data", pattern = "cf_consolidated", full.names = TRUE)
+cf_files <- list.files(paste0(dir_data, "cleaned data"), pattern = "cf_consolidated", full.names = TRUE)
 cf_consolidated <- map(cf_files %>% max(), ~read_tibble(.x)) %>% bind_rows()
 
 
@@ -986,9 +988,6 @@ fundamentals_consolidated <-
 stopifnot(!fundamentals_consolidated %>% select(ticker, fundamentals_date) %>% duplicated() %>% which() %>% any())
 
 
-# Save
-# fwrite(fundamentals_consolidated, "cleaned data/fundamentals_consolidated.csv")
-
 
 
 # Select tickers with at least 7 years of fundamentals (7Y)
@@ -1004,13 +1003,13 @@ combined_fundamentals_filtered <-
 
 
 # Save
-fwrite(combined_fundamentals_filtered, "cleaned data/combined_fundamentals_filtered.csv")
+fwrite(combined_fundamentals_filtered, paste0(dir_data, "cleaned data/combined_fundamentals_filtered.csv"))
 
 
 
 # Identify tickers that could not be downloaded cleanly
 #  the last time with BatchGetSymbols
-files_control <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/prices", full.names = TRUE, pattern = "control_group")
+files_control <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/prices", full.names = TRUE, pattern = "control_group")
 tickers_with_dirty_prices <-
     files_control %>% 
     map(~read_tibble(.x) %>% filter(threshold.decision == "OUT")) %>% 
@@ -1028,7 +1027,7 @@ tickers_with_clean_prices <-
 
 # Save list of tickers to use when downloading prices
 write_lines(tickers_with_clean_prices, 
-            "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data/tickers_with_clean_prices.txt")
+            "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data/tickers_with_clean_prices.txt")
 
 
 
@@ -1043,7 +1042,7 @@ write_lines(tickers_with_clean_prices,
 # Prices data             #
 #~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-prices_SP500TR_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data",
+prices_SP500TR_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
                            pattern = "prices_SP500TR.csv", full.names = TRUE)
 prices_SP500TR <- read_tibble(prices_SP500TR_file)
 prices_SP500TR_monthly <-
@@ -1063,15 +1062,15 @@ prices_SP500TR_monthly <-
 
 
 
-# files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data",
+# files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
 #                            pattern = "prices_\\d{1,5}_\\d{1,5}.csv", full.names = TRUE)
-files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/prices",
+files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/prices",
                            pattern = "prices_group_\\d{1,5}.csv", full.names = TRUE)
 
 
 
 
-# prices_SP500TR_monthly_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data",
+# prices_SP500TR_monthly_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
 #                                   pattern = "prices_SP500TR.csv", full.names = TRUE)
 # prices_SP500TR <- read_tibble(prices_SP500TR_file)
 # prices_SP500TR_monthly
@@ -1101,11 +1100,11 @@ prices_monthly <-
 
 
 # Write to csv
-fwrite(prices_monthly, paste0("cleaned data/prices_monthly (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(prices_monthly, paste0(dir_data, "cleaned data/prices_monthly (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 # Read saved prices_monthly
-file_prices_monthly <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data",
+file_prices_monthly <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
                                 pattern = "prices_monthly \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
 prices_monthly <- read_tibble(file_prices_monthly)
 
@@ -1118,7 +1117,7 @@ tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
 #-----------------------------------------#
 # Part 10 - Merge Prices and Fundamentals
 #-----------------------------------------#
-# files_prices_monthly_joined <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data",
+# files_prices_monthly_joined <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
 #                            pattern = "prices_monthly_joined \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
 
 # prices_monthly_joined <- read_tibble(files_prices_monthly_joined)
@@ -1146,7 +1145,7 @@ fundamentals_full_dates <-
     arrange(ticker, fundamentals_date)
 
 # Save
-fwrite(fundamentals_full_dates, "cleaned data/fundamentals_full_dates.csv")
+fwrite(fundamentals_full_dates, paste0(dir_data, "cleaned data/fundamentals_full_dates.csv"))
 
 
 
@@ -1188,7 +1187,7 @@ combined_fundamentals_merged <-
               by = c("ticker", "decision_date_9m_forward" = "fundamentals_date"))
 
 # Save
-fwrite(combined_fundamentals_merged, "cleaned data/combined_fundamentals_merged.csv")
+fwrite(combined_fundamentals_merged, paste0(dir_data, "cleaned data/combined_fundamentals_merged.csv"))
 
 
 # Load libraries and helper functions
@@ -1221,7 +1220,7 @@ fundamentals_filled <-
 
 
 # Write to CSV
-fwrite(fundamentals_filled, paste0("cleaned data/fundamentals_filled (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(fundamentals_filled, paste0(dir_data, "cleaned data/fundamentals_filled (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
@@ -1232,7 +1231,7 @@ fwrite(fundamentals_filled, paste0("cleaned data/fundamentals_filled (", Sys.Dat
 source("helper functions.R")
 
 # Read
-file_fundamentals_filled <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data/cleaned data", pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
+file_fundamentals_filled <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data", pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
 fundamentals_filled <- read_tibble(file_fundamentals_filled)
 
 # fundamentals_filled %>%
@@ -1386,7 +1385,7 @@ the_end <- Sys.time(); the_end - the_start # ~ 15 mins
 
 
 
-sector_industry_data_file <- list.files("cleaned data", pattern = "^sector_industry_data", full.names = TRUE) %>% max()
+sector_industry_data_file <- list.files(paste0(dir_data, "cleaned data"), pattern = "^sector_industry_data", full.names = TRUE) %>% max()
 sector_industry_data <- read_tibble(sector_industry_data_file)
 
 
@@ -1404,7 +1403,7 @@ ratios_joined <-
 
 
 # WILL5000INDFC	Wilshire 5000 Total Market;Full Cap Index; Index; Daily; Not seasonally adjusted
-prices_from_FRED <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals Data", pattern = "Prices from FRED", full.names = TRUE) %>% max()
+prices_from_FRED <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data", pattern = "Prices from FRED", full.names = TRUE) %>% max()
 index_WILL5000 <- read_tibble(prices_from_FRED) %>% 
   filter(symbol == "WILL5000INDFC")
 
@@ -1541,7 +1540,7 @@ ratios_final <-
 
 
 # Save to this project's data directory
-fwrite(ratios_final, paste0("cleaned data/ratios_final (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(ratios_final, paste0(dir_data, "cleaned data/ratios_final (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(ratios_final, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/ratios_final (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -1549,11 +1548,18 @@ fwrite(ratios_final, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-anal
 
 source("helper functions.R")
 
-file_ratios_final <- list.files("cleaned data", pattern = "ratios_final", full.names = TRUE) %>% max()
+file_ratios_final <- list.files(paste0(dir_data, "cleaned data"), pattern = "ratios_final", full.names = TRUE) %>% max()
 ratios_final <- read_tibble(file_ratios_final)
 
 
-skimr::skim(ratios_final)
+ratios_final %>% 
+      summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
+      pivot_longer(-ticker) %>% 
+      select(-ticker) %>% 
+      arrange(value) %>% View()
+      
+
+# skimr::skim(ratios_final)
 
 
 ratios_complete <-
@@ -1564,7 +1570,7 @@ ratios_complete <-
                                  "sector_yhoo", 
                                  "adj_return_6M",
                                  "free_cash_flow_to_assets",
-                                 "leverage_index",
+                                 # "leverage_index",
                                  "total_accruals_to_total_assets"))
 
 ratios_complete %>% distinct(ticker)
@@ -1580,7 +1586,7 @@ ratios_complete %>% summary()
 # Load libraries and helper functions
 source("helper functions.R")
 
-ratios_final_file <- list.files("cleaned data", pattern = "ratios_final", full.names = TRUE) %>% max()
+ratios_final_file <- list.files(paste0(dir_data, "cleaned data"), pattern = "ratios_final", full.names = TRUE) %>% max()
 ratios_final <- read_tibble(ratios_final_file)
 
 # ratios_final %>%

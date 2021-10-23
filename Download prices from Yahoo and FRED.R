@@ -11,7 +11,8 @@ library(data.table)
 library(lubridate)
 
 
-tickers <- read_excel("Tickers.xlsx", sheet = 1) %>% 
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
+tickers <- read_excel(paste0(dir_data, "Tickers.xlsx"), sheet = 1) %>% 
     pull(Ticker)
 
 # tickers %>% distinct(Description) %>% pull()
@@ -47,7 +48,7 @@ prices_from_tickers <-
 
 
 # Save
-fwrite(prices_from_tickers, paste0("Prices from Tickers (", str_replace_all(Sys.Date(), "-", " "), ").csv"))
+fwrite(prices_from_tickers, paste0(dir_data, "Prices from Tickers (", str_replace_all(Sys.Date(), "-", " "), ").csv"))
 fwrite(prices_from_tickers, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/Prices from Tickers (", str_replace_all(Sys.Date(), "-", " "), ").csv"))
 
 
@@ -58,7 +59,7 @@ library(quantmod)
 library(readxl)
 library(data.table)
 
-symbols <- read_excel(paste0("FRED Tickers.xlsx"), col_names = TRUE, sheet = 1, range = "A1:B100") %>% 
+symbols <- read_excel(paste0(dir_data, "FRED Tickers.xlsx"), col_names = TRUE, sheet = 1, range = "A1:B100") %>% 
     drop_na("FRED Symbol") %>% 
     pull("FRED Symbol") %>% 
     .[. != "USDX"]
@@ -85,7 +86,7 @@ prices_econ <- data.frame(date = index(do.call(merge, Stocks)),
 
 
 # Save
-fwrite(prices_econ, paste0("Prices from FRED (", str_replace_all(Sys.Date(), "-", " "), ").csv"))
+fwrite(prices_econ, paste0(dir_data, "Prices from FRED (", str_replace_all(Sys.Date(), "-", " "), ").csv"))
 fwrite(prices_econ, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/Prices from FRED (", str_replace_all(Sys.Date(), "-", " "), ").csv"))
 
 
@@ -99,7 +100,7 @@ library(tidyverse)
 library(lubridate)
 library(BatchGetSymbols)
 
-tickers <- read_lines("cleaned data/tickers_with_clean_prices.txt") %>% 
+tickers <- read_lines(paste0(dir_data, "cleaned data/tickers_with_clean_prices.txt")) %>% 
     {.[. != "NA"]}
 # tickers <- sample(tickers, 5)
 
@@ -116,8 +117,8 @@ get_and_save_prices <- function(rng = 1:100) {
                                    be.quiet = TRUE)
     
     # Save
-    data.table::fwrite(prices_fund$df.tickers, paste0("cleaned data/prices_daily_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
-    data.table::fwrite(prices_fund$df.control, paste0("cleaned data/df_control - prices_daily_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
+    data.table::fwrite(prices_fund$df.tickers, paste0(dir_data, "cleaned data/prices_daily_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
+    data.table::fwrite(prices_fund$df.control, paste0(dir_data, "cleaned data/df_control - prices_daily_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
     
 }
 
