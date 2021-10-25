@@ -327,7 +327,8 @@ library(data.table)
 
 dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/Input data"
 input_data_file <- list.files(dir_r, pattern = "Input data\\.csv", full.names = TRUE) %>% max()
-input_data <- read_tibble(input_data_file, date_format = "%m/%d/%Y")
+input_data <- read_tibble(input_data_file, date_format = "%m/%d/%Y") %>% 
+      mutate(fundamentals_date = as.Date(fundamentals_date, "%m/%d/%Y"))
 
 
 
@@ -816,6 +817,18 @@ file_yhoo_profiles <- list.files(paste0(dir_data, "cleaned data"), pattern = "yh
 yhoo_profile_data <- map(file_yhoo_profiles, ~read_tibble(.x)) %>% bind_rows() %>% distinct()
 
 
+# Remove similar longBusinessSummary values
+yhoo_profile_data <-
+      yhoo_profile_data %>% 
+      mutate(len_bus_summ = nchar(longBusinessSummary)) %>% 
+      group_by(ticker) %>%
+      arrange(desc(len_bus_summ)) %>% 
+      slice(1) %>% 
+      select(-len_bus_summ)
+      
+      
+
+
 
 yhoo_sector_industry_data <-
     yhoo_profile_data %>% 
@@ -998,7 +1011,8 @@ combined_fundamentals_filtered <-
   filter(sum(!is.na(revenue_1Y)) >= 3) %>% 
   # Select only tickers with at least 7 years of quarterly data
   filter(as.integer(last(fundamentals_date) - first(fundamentals_date)) / 365 >= 7) %>%
-  arrange(ticker, fundamentals_date)
+  arrange(ticker, fundamentals_date) %>% 
+      filter(ticker != "")
 
 
 
@@ -1009,9 +1023,12 @@ fwrite(combined_fundamentals_filtered, paste0(dir_data, "cleaned data/combined_f
 
 # Identify tickers that could not be downloaded cleanly
 #  the last time with BatchGetSymbols
-files_control <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/prices", full.names = TRUE, pattern = "control_group")
+files_control <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data", full.names = TRUE, pattern = "df_control") 
+max_date <- files_control %>% str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% flatten_chr() %>% max()
+files_control <- files_control %>% str_subset(max_date)
+
 tickers_with_dirty_prices <-
-    files_control %>% 
+    files_control %>%
     map(~read_tibble(.x) %>% filter(threshold.decision == "OUT")) %>% 
     bind_rows() %>% 
     pull(ticker)
@@ -1042,45 +1059,53 @@ write_lines(tickers_with_clean_prices,
 # Prices data             #
 #~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-prices_SP500TR_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
-                           pattern = "prices_SP500TR.csv", full.names = TRUE)
-prices_SP500TR <- read_tibble(prices_SP500TR_file)
+prices_SP500TR_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data", pattern = "Prices from Tickers", full.names = TRUE) %>% max()
+prices_SP500TR <- read_tibble(prices_SP500TR_file, date_format = "%m/%d/%Y") %>% 
+      filter(ticker == "^SP500TR")
+
 prices_SP500TR_monthly <-
     prices_SP500TR %>%
-    rename(ticker = symbol, SP500TR_adjusted = adjusted) %>% 
+    rename(SP500TR_adjusted = price.adjusted) %>% 
     slice(endpoints(date, on = "months")) %>% 
     # Round dates to end of month (sometimes the last trading
     #  day of a month is before the last day of the month)
     mutate(rounded_date = round_date(date, unit = "month") - days(1),
+           SP500TR_adj_return_monthly = SP500TR_adjusted / lag(SP500TR_adjusted, 1) - 1,
            SP500TR_adj_return_qtrly = SP500TR_adjusted / lag(SP500TR_adjusted, 3) - 1) %>% 
     # Rounding the dates sometimes creates duplicate dates if the 
     # most recent date is rounded down to the prior month-end, so
     # remove such duplicates in that case
     filter(!duplicated(rounded_date)) %>% 
-    select(-date, -close) %>% 
+    select(-date, -price.close, -price.open, -price.high, -price.low, 
+           -ret.adjusted.prices, -ret.closing.prices, -volume) %>% 
     select(ticker, rounded_date, everything())
 
 
-
-# files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
-#                            pattern = "prices_\\d{1,5}_\\d{1,5}.csv", full.names = TRUE)
-files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/prices",
-                           pattern = "prices_group_\\d{1,5}.csv", full.names = TRUE)
+# Save
+fwrite(prices_SP500TR_monthly, paste0(dir_data, "cleaned data/", "prices_SP500TR.csv"))
 
 
 
+files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
+                           pattern = "^prices_daily_\\d{1,5}_\\d{1,5}", full.names = TRUE)
+max_date <- files_prices %>% str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
+      flatten_chr() %>% max()
 
-# prices_SP500TR_monthly_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
-#                                   pattern = "prices_SP500TR.csv", full.names = TRUE)
-# prices_SP500TR <- read_tibble(prices_SP500TR_file)
-# prices_SP500TR_monthly
+files_prices <- files_prices %>% str_subset(max_date)
+
+
+
+
+
+prices_SP500TR_monthly_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
+                                  pattern = "prices_SP500TR.csv", full.names = TRUE)
+prices_SP500TR_monthly <- read_tibble(prices_SP500TR_monthly_file)
 
 
 
 
 
 # Add RSI and stochastic signals
-
 prices_monthly <- 
     files_prices %>% 
     map(~read_and_clean(.x)) %>% 
@@ -1110,9 +1135,6 @@ prices_monthly <- read_tibble(file_prices_monthly)
 
 tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
 
-# prices_monthly %>% filter(str_detect(ticker, "^S")) %>% 
-#   distinct(ticker) %>% View()
-
 
 #-----------------------------------------#
 # Part 10 - Merge Prices and Fundamentals
@@ -1122,7 +1144,7 @@ tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
 
 # prices_monthly_joined <- read_tibble(files_prices_monthly_joined)
 
-combined_fundamentals_filtered <- read_tibble("cleaned data/combined_fundamentals_filtered.csv")
+combined_fundamentals_filtered <- read_tibble(paste0(dir_data, "cleaned data/combined_fundamentals_filtered.csv"))
 
 
 
@@ -1132,6 +1154,11 @@ combined_fundamentals_filtered <- read_tibble("cleaned data/combined_fundamental
 fundamentals_with_prices <-
   combined_fundamentals_filtered %>%
   filter(ticker %in% tickers_from_prices)
+
+
+!!!!
+fundamentals_with_prices %>% distinct(ticker)
+
 
 
 # Fill date range
@@ -1151,7 +1178,7 @@ fwrite(fundamentals_full_dates, paste0(dir_data, "cleaned data/fundamentals_full
 
 
 # Read
-fundamentals_full_dates <- read_tibble("cleaned data/fundamentals_full_dates.csv")
+fundamentals_full_dates <- read_tibble(paste0(dir_data, "cleaned data/fundamentals_full_dates.csv"))
 
 
 
@@ -1193,7 +1220,7 @@ fwrite(combined_fundamentals_merged, paste0(dir_data, "cleaned data/combined_fun
 # Load libraries and helper functions
 source("helper functions.R")
 
-combined_fundamentals_merged <- read_tibble("cleaned data/combined_fundamentals_merged.csv")
+combined_fundamentals_merged <- read_tibble(paste0(dir_data, "cleaned data/combined_fundamentals_merged.csv"))
 
 # Find percent of missing values
 combined_fundamentals_merged %>%
@@ -1556,27 +1583,61 @@ ratios_final %>%
       summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
       pivot_longer(-ticker) %>% 
       select(-ticker) %>% 
-      arrange(value) %>% View()
+      arrange(value) %>% 
+      mutate(name = str_trunc(name, 35)) %>% 
+      ggplot(aes(value, fct_reorder(name, value))) +
+      # geom_vline(aes(xintercept = value))
+      geom_point()
       
-
 # skimr::skim(ratios_final)
 
+fields_to_use <-
+      ratios_final %>% 
+      summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
+      gather() %>% 
+      arrange(value) %>% 
+      filter(value < 0.30) %>% 
+      pull(key) %>% 
+      .[!str_starts(., "decision")]
 
-ratios_complete <-
+
+
+
+
+ratios_complete_set <-
   get_complete_series(data = ratios_final, 
                       date_range_yrs = 3,
-                      fields = c("ticker", 
-                                 "fundamentals_date", 
-                                 "sector_yhoo", 
-                                 "adj_return_6M",
-                                 "free_cash_flow_to_assets",
-                                 # "leverage_index",
-                                 "total_accruals_to_total_assets"))
+                      fields = fields_to_use)
 
-ratios_complete %>% distinct(ticker)
-ratios_complete %>% distinct(sector_yhoo)
-ratios_complete %>% summary()
 
+# Find all unique combinations of fields in the list and
+# see which combination produces the largest data set
+
+
+
+
+
+
+# nums <- seq_along(fields_to_use) %>% tail(8)
+# 
+# 
+# alist <- list()
+# for(i in nums) {
+#       print(i)
+#       alist[[i]] <- combn(fields_to_use, i, simplify = FALSE)
+# }
+# 
+
+
+
+
+ratios_complete_set %>% distinct(ticker)
+ratios_complete_set %>% distinct(sector_yhoo)
+ratios_complete_set %>% summary()
+
+
+# Save
+fwrite(ratios_complete_set, paste0(dir_data))
 
 
 

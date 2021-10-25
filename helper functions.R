@@ -10,10 +10,18 @@ suppressPackageStartupMessages({
     library(slider) # slide_dbl()
 })
 
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
+
 
 
 read_tibble <- function(x, date_format = "%Y-%m-%d") {
     
+      ####
+      # x <- input_data_file
+      # date_format <- "%m/%d/%Y"
+      ####
+      
+      
     x %>%
         fread(fill = TRUE) %>%
         as_tibble() %>%
@@ -99,12 +107,15 @@ read_and_clean <- function(file) {
 }
 
 
+
 # Given tickers and fields, find a complete series of data, if it exists
 # Reduce range of tickers and dates to get a complete series for a given field
 get_complete_series <- function(data, fields, date_range_yrs = 5) {
     #######
     # data <- ratios_final
     # date_range_yrs <- 3
+    # fields <- fields_to_use
+    
     # fields <- c("ticker", "fundamentals_date", "sector_yhoo",
     # "free_cash_flow_to_assets", "operating_income_1Q")
     # fields <- c("ticker",
@@ -125,15 +136,16 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
     # Search through all possible time spans of length "date_range_yrs" and
     #  find the date range with the fewest NAs
     date_range_w_least_nas <-
-        data_subset %>% 
+        data_subset %>%
         select(-ticker) %>% 
         group_by(fundamentals_date) %>% 
         nest() %>% 
+        mutate(fundamentals_date, data_points = map_dbl(data, ~ncol(.x)*nrow(.x))) %>% 
         # left_join(data_subset %>% select(-ticker) %>% count(fundamentals_date)) %>% 
-        transmute(fundamentals_date, 
-                  na_perc = sum(is.na(unlist(data))) / length(unlist(data))) %>% 
-        arrange(fundamentals_date) %>% 
+        mutate(na_perc = sum(is.na(unlist(data))) / data_points) %>% 
         ungroup() %>% 
+        arrange(fundamentals_date) %>% 
+        
         mutate(p_na_trailing_n_yrs = slider::slide_dbl(na_perc, sum, .before = 12*date_range_yrs-1, .complete = TRUE)) %>% 
         slice_min(p_na_trailing_n_yrs) %>% 
         tail(1) %>% 
@@ -181,12 +193,21 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
     
     date_diffs <-
         data_cl_sector %>% 
+        arrange(fundamentals_date)
         group_by(ticker) %>%
         select(ticker, fundamentals_date) %>% 
         mutate(date_diff = as.numeric(fundamentals_date - lag(fundamentals_date))) %>% 
         # Replace each initial NA with a safe number, 30, so that the row isn't dropped later
         mutate(date_diff = replace(date_diff, row_number() == 1, 30))
     
+    
+    
+    date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
+    
+    # data_cl_sector %>% 
+    #       filter(ticker == "AAME") %>% 
+    #       View()
+    # 
     
     # If any of the date differences are not between 27 and 32, then stop
     if(!date_diffs %>% pull(date_diff) %>% between(., 27, 32) %>% all())
