@@ -12,9 +12,9 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 # SLOW!!! (over 5,000 tickers' worth of fundamentals)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # reticulate::source_python("C:/Users/user/Desktop/Aaron/R/Projects/yahoo data/get_yahoo_data.py")
-# rm(list = ls()[!ls() %in% grep("start|end", ls(), value = TRUE)])
+# rm(list = ls()[!ls() %in% grep("start|end|dir_data", ls(), value = TRUE)])
 # source("C:/Users/user/Desktop/Aaron/R/Projects/yahoo data/clean data.R")
-# rm(list = ls()[!ls() %in% grep("start|end", ls(), value = TRUE)])
+# rm(list = ls()[!ls() %in% grep("start|end|dir_data", ls(), value = TRUE)])
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
@@ -28,7 +28,7 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 # start98 <- Sys.time()
 # source("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/Download prices from Yahoo and FRED.R")
 # end98 <- Sys.time(); end98 - start98
-# rm(list = ls()[!ls() %in% grep("start|end", ls(), value = TRUE)])
+# rm(list = ls()[!ls() %in% grep("start|end|dir_data", ls(), value = TRUE)])
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
@@ -766,7 +766,7 @@ fwrite(cf_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-a
 
 
 # Clear namespace
-rm(list = ls()[!ls() %in% grep("start|end", ls(), value = TRUE)])
+rm(list = ls()[!ls() %in% grep("start|end|dir_data", ls(), value = TRUE)])
 
 
 
@@ -806,6 +806,8 @@ rm(list = ls()[!ls() %in% grep("start|end", ls(), value = TRUE)])
 # Sector/Industry data
 #~~~~~~~~~~~~~~~~~~~~~~#
 
+source("helper functions.R")
+
 # Profiles (ratios + industry, company names, etc.)
 
 file_edgar_profiles <- list.files(paste0(dir_data, "cleaned data"), pattern = "edgar_profiles", full.names = TRUE)
@@ -814,29 +816,40 @@ edgar_profile_data <- map(file_edgar_profiles, ~read_tibble(.x)) %>% bind_rows()
 
 file_yhoo_profiles <- list.files(paste0(dir_data, "cleaned data"), pattern = "yhoo_profiles", full.names = TRUE)
 
-yhoo_profile_data <- map(file_yhoo_profiles, ~read_tibble(.x)) %>% bind_rows() %>% distinct()
+yhoo_profile_data <- 
+      map(file_yhoo_profiles, ~read_tibble(.x)) %>% 
+      bind_rows() %>% 
+      distinct() %>% 
+      rename(date = download_date)
 
 
 # Remove similar longBusinessSummary values
 yhoo_profile_data <-
       yhoo_profile_data %>% 
-      mutate(len_bus_summ = nchar(longBusinessSummary)) %>% 
-      group_by(ticker) %>%
-      arrange(desc(len_bus_summ)) %>% 
+      select(ticker, date, everything()) %>% 
+      arrange(ticker, desc(date)) %>% 
+      group_by(ticker) %>% 
+      fill(c(sector, industry), .direction = "down") %>% 
+      fill(c(sector, industry), .direction = "up") %>% 
       slice(1) %>% 
-      select(-len_bus_summ)
+      ungroup() %>% 
+      mutate(industry = snakecase::to_snake_case(industry),
+             sector = snakecase::to_snake_case(sector)) %>% 
+      select(ticker, date, sector, industry, long_business_summary,
+             shares_outstanding, short_ratio, 
+             held_percent_institutions, peg_ratio) %>% 
+      distinct()
       
-      
-
-
 
 yhoo_sector_industry_data <-
     yhoo_profile_data %>% 
-    select(ticker, date, sector, industry, longBusinessSummary,
-           sharesOutstanding, shortRatio, 
-           heldPercentInstitutions, pegRatio) %>% 
-    mutate(across(c(sector, industry), ~snakecase::to_snake_case(.x))) %>% 
-    # Rename some fields (to match industry names in YHOO data)
+    mutate(across(c(sector, industry), 
+                  # Remove strange characters from strings
+                  ~str_replace_all(.x, "[^\u0001-\u007F]", "_") %>% 
+                        str_replace_all("rei_t", "reit") %>%
+                        str_replace_all("__", "_") %>% 
+                        str_replace_all("__", "_"))) %>% 
+      # Rename some fields (to match industry names in YHOO data)
     mutate(industry = industry %>% 
                str_replace("^coking_coal$", "coal") %>% 
                str_replace("^consulting_services$", "consulting") %>%
@@ -861,10 +874,12 @@ yhoo_sector_industry_data <-
                str_replace("^semiconductor_equipment_materials$", "semiconductors") %>% 
                str_replace("^scientific_technical_instruments$", "computer_hardware") %>% 
                str_replace("^leisure$", "travel_leisure") %>% 
-               str_replace("^specialty_retail$", "apparel_retail") %>% 
+               # str_replace("^specialty_retail$", "apparel_retail") %>% 
                str_replace("^software_infrastructure$", "online_media"))
-    # filter(startsWith(industry, "insura")) %>% View()
            
+
+
+
 
 
 dir_sf <- "C:/Users/user/Desktop/Aaron/R/Projects/simfinR/data/cleaned data"
@@ -951,10 +966,10 @@ shares_basic <-
                          cf_consolidated %>% select(ticker, rounded_date, cf_shares_basic = shares_basic),
                          bs_consolidated %>% select(ticker, rounded_date, bs_shares_basic = shares_basic),
                          sector_industry_data %>%
-                           drop_na(sharesOutstanding) %>%
+                           drop_na(shares_outstanding) %>%
                            transmute(ticker, 
                                      rounded_date = floor_date(ymd(date), unit = "months") - days(1),
-                                     yhoo_shares_basic = sharesOutstanding))) %>% 
+                                     yhoo_shares_basic = shares_outstanding))) %>% 
     
   mutate(shares_basic = coalesce(is_shares_basic, cf_shares_basic, bs_shares_basic, yhoo_shares_basic)) %>% 
   select(-is_shares_basic, -cf_shares_basic, -bs_shares_basic, -yhoo_shares_basic)
@@ -1154,10 +1169,6 @@ combined_fundamentals_filtered <- read_tibble(paste0(dir_data, "cleaned data/com
 fundamentals_with_prices <-
   combined_fundamentals_filtered %>%
   filter(ticker %in% tickers_from_prices)
-
-
-!!!!
-fundamentals_with_prices %>% distinct(ticker)
 
 
 
@@ -1421,9 +1432,9 @@ ratios_joined <-
   ratios %>% 
   select(!ends_with("est")) %>% 
   left_join(sector_industry_data %>% select(ticker, fundamentals_date = date, 
-                                       shares_basic_sec_ind = sharesOutstanding,
-                                       short_ratio = shortRatio,
-                                       heldPercentInstitutions)) %>% 
+                                       shares_basic_sec_ind = shares_outstanding,
+                                       short_ratio = short_ratio,
+                                       held_percent_institutions)) %>% 
   left_join(sector_industry_data %>% select(where(is.character)))
     # filter(!is.na(revenue) & !is.na(total_assets)) %>% 
     # select(!(selling_general_administrative:total_stockholder_equity), total_assets) %>% 
@@ -1560,7 +1571,6 @@ ratios_final <-
   consolidate_categories(field = "industry_detail_edgar") %>% 
   consolidate_categories(field = "industry_yhoo") %>% 
   consolidate_categories(field = "industry_simfin")
-
 
 
 

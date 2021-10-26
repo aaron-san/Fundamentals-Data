@@ -19,8 +19,10 @@ read_tibble <- function(x, date_format = "%Y-%m-%d") {
       ####
       # x <- input_data_file
       # date_format <- "%m/%d/%Y"
+      # x <- file_yhoo_profiles[1]
+      # date_format <- "%Y_%m_%d"
+      # date_format <- "%Y-%m-%d"
       ####
-      
       
     x %>%
         fread(fill = TRUE) %>%
