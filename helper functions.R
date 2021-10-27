@@ -110,6 +110,7 @@ read_and_clean <- function(file) {
 
 
 
+
 # Given tickers and fields, find a complete series of data, if it exists
 # Reduce range of tickers and dates to get a complete series for a given field
 get_complete_series <- function(data, fields, date_range_yrs = 5) {
@@ -195,21 +196,15 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
     
     date_diffs <-
         data_cl_sector %>% 
-        arrange(fundamentals_date)
+        arrange(fundamentals_date) %>% 
         group_by(ticker) %>%
         select(ticker, fundamentals_date) %>% 
         mutate(date_diff = as.numeric(fundamentals_date - lag(fundamentals_date))) %>% 
         # Replace each initial NA with a safe number, 30, so that the row isn't dropped later
         mutate(date_diff = replace(date_diff, row_number() == 1, 30))
     
-    
-    
-    date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
-    
-    # data_cl_sector %>% 
-    #       filter(ticker == "AAME") %>% 
-    #       View()
-    # 
+    # date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
+
     
     # If any of the date differences are not between 27 and 32, then stop
     if(!date_diffs %>% pull(date_diff) %>% between(., 27, 32) %>% all())
