@@ -34,13 +34,13 @@ read_tibble <- function(x, date_format = "%Y-%m-%d") {
 
 
 # Round report date to nearest month-end
-get_rounded_date <- . %>% 
+  get_rounded_date <- . %>% 
     # as_tibble() %>% 
     mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>%
     select(-report_date) %>% 
     select(ticker, rounded_date, everything())
     
-
+# get_rounded_date(tibble(ticker = "MSFT", report_date = ymd("2021-12-29")))
 
 
 # Some tickers have multiple instances of a date but unequal values, so
