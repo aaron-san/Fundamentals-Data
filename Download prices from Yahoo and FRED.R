@@ -102,6 +102,10 @@ library(BatchGetSymbols)
 
 tickers <- read_lines(paste0(dir_data, "cleaned data/tickers_with_clean_prices.txt")) %>% 
     {.[. != "NA"]}
+
+
+
+!!! tickers in fundamentals????
 # tickers <- sample(tickers, 5)
 
 options(future.rng.onMisuse = "ignore")
@@ -123,24 +127,19 @@ get_and_save_prices <- function(rng = 1:100) {
 }
 
 
-get_and_save_prices(rng = 1:100)
-get_and_save_prices(rng = 101:200)
-get_and_save_prices(rng = 201:300)
-get_and_save_prices(rng = 301:400)
-get_and_save_prices(rng = 401:500)
-get_and_save_prices(rng = 501:600)
-get_and_save_prices(rng = 601:700)
-get_and_save_prices(rng = 701:800)
-get_and_save_prices(rng = 801:900)
-get_and_save_prices(rng = 901:1000)
-get_and_save_prices(rng = 1001:1100)
-get_and_save_prices(rng = 1101:1200)
-get_and_save_prices(rng = 1201:1300)
-get_and_save_prices(rng = 1301:1400)
-get_and_save_prices(rng = 1401:1500)
-get_and_save_prices(rng = 1501:1600)
-get_and_save_prices(rng = 1601:1700)
-get_and_save_prices(rng = 1701:1800)
+start <- seq(from = 1, to = length(tickers), by = 200)
+end <- start + 199
+end[length(end)] <- min(length(tickers), end[length(end)])
+
+
+
+# start <- start[start >= 2800]
+# end <- end[end > 2800]
+
+for(i in seq_along(start)) {
+    get_and_save_prices(rng = start[i]:end[i])
+    print(c(start[i], end[i], "done!"))
+} 
 
 
 !!!!! Code to delete old price files

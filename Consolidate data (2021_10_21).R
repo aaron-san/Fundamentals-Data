@@ -1124,35 +1124,17 @@ fundamentals_consolidated <-
   filter(!duplicated(select(., ticker, report_date))) %>% 
   select(-n_vals) %>% 
   setorder(ticker, report_date) %>% 
-  as_tibble()
-
-!!!! START
-fundamentals_consolidated %>% filter(ticker == "PLTR")
+  as_tibble() %>% 
+  filter(ticker != "")
 
 
 # If there are any duplicate dates for any ticker, stop
 if(fundamentals_consolidated %>% select(ticker, report_date) %>% duplicated() %>% which() %>% any()) stop()
 
 
-# fundamentals_consolidated %>% 
-#   filter(ticker == "PLTR") %>% View()
-
-
-# Select tickers with at least 7 years of fundamentals (7Y)
-combined_fundamentals_filtered <-
-  fundamentals_consolidated %>%
-  group_by(ticker) %>%
-  # Keep tickers with at least 3 years of annual revenue figures
-  filter(sum(!is.na(revenue_1Y)) >= 3) %>% 
-  # Select only tickers with at least 7 years of quarterly data
-  filter(as.integer(last(report_date) - first(report_date)) / 365 >= 7) %>%
-  arrange(ticker, report_date) %>% 
-      filter(ticker != "")
-
-# combined_fundamentals_filtered %>% filter(ticker == "PLTR")
-
 # Save
-fwrite(combined_fundamentals_filtered, paste0(dir_data, "cleaned data/combined_fundamentals_filtered.csv"))
+fwrite(fundamentals_consolidated, paste0(dir_data, "cleaned data/fundamentals_consolidated.csv"))
+
 
 
 
@@ -1169,7 +1151,7 @@ tickers_with_dirty_prices <-
 
 
 tickers_with_clean_prices <-
-    combined_fundamentals_filtered %>% 
+    fundamentals_consolidated %>% 
     distinct(ticker) %>% 
     # Filter out tickers that could not be downloaded cleanly using BatchGetSymbols
     filter(!ticker %in% tickers_with_dirty_prices) %>% 
@@ -1177,7 +1159,7 @@ tickers_with_clean_prices <-
 length(tickers_with_clean_prices)
 
 # Save list of tickers to use when downloading prices
-write_lines(tickers_with_clean_prices, 
+write_lines(tickers_with_clean_prices,
             "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data/tickers_with_clean_prices.txt")
 
 
@@ -1227,8 +1209,9 @@ max_date <- files_prices %>% str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>%
 
 files_prices <- files_prices %>% str_subset(max_date)
 
-prices_raw <- files_prices %>% 
-      map_df(~read_and_clean(.x))
+prices_raw <- files_prices %>% map_df(~read_and_clean(.x))
+
+# prices_raw %>% filter(ticker == "PLTR")
 
 
 prices_daily_last_10y <-
@@ -1264,6 +1247,8 @@ prices_monthly <-
     ungroup() %>% 
     filter(report_date <= Sys.Date())
 
+# prices_monthly %>% filter(ticker == "PLTR")
+
 
 # Write to csv
 fwrite(prices_monthly, paste0(dir_data, "cleaned data/prices_monthly (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
@@ -1290,15 +1275,16 @@ tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
 #-----------------------------------------#
 # Part 10 - Merge Prices and Fundamentals
 #-----------------------------------------#
-combined_fundamentals_filtered <- read_tibble(paste0(dir_data, "cleaned data/combined_fundamentals_filtered.csv"))
+fundamentals_consolidated <- read_tibble(paste0(dir_data, "cleaned data/fundamentals_consolidated.csv"))
 
 
 # Filter out tickers that have no price data
 fundamentals_with_prices <-
-  combined_fundamentals_filtered %>%
+  fundamentals_consolidated %>%
   filter(ticker %in% tickers_from_prices)
 
-# fundamentals_with_prices %>% filter(ticker == "PLTR")
+
+fundamentals_with_prices %>% filter(ticker == "PLTR")
 
 # Fill date range
 # full_date_set <- sort(Sys.Date() %>% floor_date(unit = "month") - months(0:(12*30)) - days(1))
@@ -1310,16 +1296,11 @@ fundamentals_full_dates <-
     complete(report_date = seq.Date(first(report_date), last(report_date), by = "months") %>% round_date(unit = "month") - days(1)) %>%
     arrange(ticker, report_date)
 
-# Save
-# fwrite(fundamentals_full_dates, paste0(dir_data, "cleaned data/fundamentals_full_dates.csv"))
-
-# Read
-# fundamentals_full_dates <- read_tibble(paste0(dir_data, "cleaned data/fundamentals_full_dates.csv"))
-
-# fundamentals_full_dates %>% filter(ticker == "PLTR")
-
-
 # !!!! START
+fundamentals_full_dates %>% filter(ticker == "PLTR")
+
+
+
 combined_fundamentals_merged <-
     fundamentals_full_dates %>% 
     left_join(
