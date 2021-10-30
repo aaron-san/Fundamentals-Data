@@ -1205,7 +1205,7 @@ fwrite(prices_SP500TR_monthly, paste0(dir_data, "cleaned data/", "prices_SP500TR
 
 
 files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
-                           pattern = "^prices_daily_\\d{1,5}_\\d{1,5}", full.names = TRUE)
+                           pattern = "^prices_weekly_\\d{1,6}\\_\\d{1,6}", full.names = TRUE)
 max_date <- files_prices %>% str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
       flatten_chr() %>% max()
 
@@ -1215,6 +1215,10 @@ prices_raw <- files_prices %>% map_df(~read_and_clean(.x))
 
 # prices_raw %>% filter(ticker == "PLTR")
 
+
+
+
+!!!!!prices_daily to prices_weekly
 
 prices_daily_last_10y <-
       prices_raw %>% 

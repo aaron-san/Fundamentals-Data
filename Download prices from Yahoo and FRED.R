@@ -122,13 +122,13 @@ get_and_save_prices <- function(rng = 1:100) {
                                    be.quiet = TRUE)
     
     # Save
-    data.table::fwrite(prices_fund$df.tickers, paste0(dir_data, "cleaned data/prices_daily_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
-    data.table::fwrite(prices_fund$df.control, paste0(dir_data, "cleaned data/df_control - prices_daily_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
+    data.table::fwrite(prices_fund$df.tickers, paste0(dir_data, "cleaned data/prices_weekly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
+    data.table::fwrite(prices_fund$df.control, paste0(dir_data, "cleaned data/df_control - prices_weekly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
     
 }
 
 
-step <- 300
+step <- 400
 start <- seq(from = 1, to = length(tickers), by = step)
 end <- start + step - 1
 end[length(end)] <- min(length(tickers), end[length(end)])
