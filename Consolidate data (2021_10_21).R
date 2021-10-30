@@ -263,6 +263,7 @@ factset_cash_flow_statements_yearly <-
 #   https://www.sec.gov/dera/data/financial-statement-data-sets.html
 # - Then, clean up with EDGAR data - consolidation.R
 #   from the "EDGAR data" project
+!!!! put source(....R in header) with instructions for cleaning zip
 #-----------------------------------------------#
 
 dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/EDGAR data/Edgar data/Modified"
@@ -1125,7 +1126,10 @@ fundamentals_consolidated <-
   select(-n_vals) %>% 
   setorder(ticker, report_date) %>% 
   as_tibble() %>% 
-  filter(ticker != "")
+  filter(ticker != "") # %>% 
+#   group_by(ticker) %>% 
+#   filter(n() > 3) %>% 
+#   ungroup()
 
 
 # If there are any duplicate dates for any ticker, stop
@@ -1134,8 +1138,6 @@ if(fundamentals_consolidated %>% select(ticker, report_date) %>% duplicated() %>
 
 # Save
 fwrite(fundamentals_consolidated, paste0(dir_data, "cleaned data/fundamentals_consolidated.csv"))
-
-
 
 
 # Identify tickers that could not be downloaded cleanly

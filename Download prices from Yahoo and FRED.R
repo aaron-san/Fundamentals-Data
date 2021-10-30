@@ -23,9 +23,9 @@ future::plan(future::multisession, workers = floor(parallel::detectCores()/2))
 
 prices <- BatchGetSymbols(tickers = tickers,
                          last.date = Sys.Date(),
-                         first.date = "1975-12-31", 
+                         first.date = "1999-12-31", 
                          # freq.data = "weekly",
-                         # do.parallel = TRUE,
+                         do.parallel = TRUE,
                          do.cache=FALSE,
                          thresh.bad.data = 0,
                          be.quiet = TRUE)
@@ -105,7 +105,7 @@ tickers <- read_lines(paste0(dir_data, "cleaned data/tickers_with_clean_prices.t
 
 
 
-!!! tickers in fundamentals????
+# !!! tickers in fundamentals????
 # tickers <- sample(tickers, 5)
 
 options(future.rng.onMisuse = "ignore")
@@ -115,7 +115,8 @@ get_and_save_prices <- function(rng = 1:100) {
     future::plan(future::multisession, workers = floor(parallel::detectCores()/2))
     prices_fund <- BatchGetSymbols(tickers = na.omit(tickers[rng]),
                                    last.date = Sys.Date(),
-                                   first.date = "1975-12-31", 
+                                   first.date = "1999-12-31", 
+                                   freq.data = "weekly",
                                    do.parallel = TRUE,
                                    thresh.bad.data = 0,
                                    be.quiet = TRUE)
@@ -127,22 +128,21 @@ get_and_save_prices <- function(rng = 1:100) {
 }
 
 
-start <- seq(from = 1, to = length(tickers), by = 200)
-end <- start + 199
+step <- 300
+start <- seq(from = 1, to = length(tickers), by = step)
+end <- start + step - 1
 end[length(end)] <- min(length(tickers), end[length(end)])
 
-
-
-# start <- start[start >= 2800]
-# end <- end[end > 2800]
+# start <- start[start >= 10200]
+# end <- end[end > 10200]
 
 for(i in seq_along(start)) {
     get_and_save_prices(rng = start[i]:end[i])
-    print(c(start[i], end[i], "done!"))
+    print(paste0(start[i], "-", end[i], " done!"))
 } 
 
 
-!!!!! Code to delete old price files
+# !!!!! Code to delete old price files
 
 
 
