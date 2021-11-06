@@ -100,6 +100,7 @@ library(tidyverse)
 library(lubridate)
 library(BatchGetSymbols)
 
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 tickers <- read_lines(paste0(dir_data, "cleaned data/tickers_with_clean_prices.txt")) %>% 
     {.[. != "NA"]}
 
@@ -116,19 +117,19 @@ get_and_save_prices <- function(rng = 1:100) {
     prices_fund <- BatchGetSymbols(tickers = na.omit(tickers[rng]),
                                    last.date = Sys.Date(),
                                    first.date = "1999-12-31", 
-                                   freq.data = "weekly",
+                                   freq.data = "monthly",
                                    do.parallel = TRUE,
                                    thresh.bad.data = 0,
                                    be.quiet = TRUE)
     
     # Save
-    data.table::fwrite(prices_fund$df.tickers, paste0(dir_data, "cleaned data/prices_weekly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
-    data.table::fwrite(prices_fund$df.control, paste0(dir_data, "cleaned data/df_control - prices_weekly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
+    data.table::fwrite(prices_fund$df.tickers, paste0(dir_data, "cleaned data/prices_monthly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
+    data.table::fwrite(prices_fund$df.control, paste0(dir_data, "cleaned data/df_control - prices_monthly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
     
 }
 
 
-step <- 400
+step <- 1000
 start <- seq(from = 1, to = length(tickers), by = step)
 end <- start + step - 1
 end[length(end)] <- min(length(tickers), end[length(end)])

@@ -14,7 +14,7 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 
 
 
-read_tibble <- function(x, date_format = "%Y-%m-%d") {
+read_tibble <- function(x, date_format = "%Y-%m-%d", ...) {
     
       ####
       # x <- input_data_file
@@ -25,7 +25,7 @@ read_tibble <- function(x, date_format = "%Y-%m-%d") {
       ####
       
     x %>%
-        fread(fill = TRUE) %>%
+        fread(fill = TRUE, ...) %>%
         as_tibble() %>%
         mutate(across(where(is.Date), ~as.Date(.x))) %>% 
         mutate(across(which(sapply(., class) == "integer64" ), as.numeric)) %>% 
@@ -101,7 +101,8 @@ read_and_clean <- function(file) {
     
     read_tibble(file) %>% 
         # as_tibble() %>% 
-        select(ticker, date = ref.date, close = price.close, adjusted = price.adjusted) %>% 
+        select(ticker, date = ref.date, close = price.close, 
+               adjusted = price.adjusted) %>% 
         group_by(ticker) %>% 
         fill(close, adjusted, .direction = "down") %>% 
         slice(endpoints(date, on = "months")) %>% 

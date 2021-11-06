@@ -23,7 +23,7 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# PRICES
+# FRED and Yahoo prices
 # Get prices from FRED and Yahoo
 # Slow! > ~41 mins
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -35,6 +35,7 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# SimFin data cleanup
 # Consolidate and clean up any newly added simFin downloaded fundamentals
 # Slow ~22-28 mins
 #  - Only run if new simFin fundamentals were downloaded
@@ -45,6 +46,12 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
 # end37 <- Sys.time(); end37 - start37
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# EDGAR data cleanup
+!!!! put source(....R in header) with instructions for cleaning zip
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
 # Load libraries and helper functions
@@ -263,7 +270,6 @@ factset_cash_flow_statements_yearly <-
 #   https://www.sec.gov/dera/data/financial-statement-data-sets.html
 # - Then, clean up with EDGAR data - consolidation.R
 #   from the "EDGAR data" project
-!!!! put source(....R in header) with instructions for cleaning zip
 #-----------------------------------------------#
 
 dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/EDGAR data/Edgar data/Modified"
@@ -1171,8 +1177,6 @@ write_lines(tickers_with_clean_prices,
 # 1,651 companies have over 5 years of data
 
 
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~#
 # Prices data             #
 #~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -1204,41 +1208,84 @@ fwrite(prices_SP500TR_monthly, paste0(dir_data, "cleaned data/", "prices_SP500TR
 
 
 
-files_prices <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
-                           pattern = "^prices_weekly_\\d{1,6}\\_\\d{1,6}", full.names = TRUE)
-max_date <- files_prices %>% str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
-      flatten_chr() %>% max()
+# !!!! Start here
+# Stock prices
+files_prices_weekly <- 
+  list.files(
+    "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
+             pattern = "^prices_weekly_\\d{1,6}\\_\\d{1,6}", 
+             full.names = TRUE)
+max_date <- 
+  files_prices_weekly %>% 
+  str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
+  flatten_chr() %>% 
+  max()
 
-files_prices <- files_prices %>% str_subset(max_date)
+files_prices_weekly <- files_prices_weekly %>% str_subset(max_date)
 
-prices_raw <- files_prices %>% map_df(~read_and_clean(.x))
+prices_weekly_raw <- 
+  files_prices_weekly %>% 
+  map_df(~read_tibble(.x)) %>%  
+  select(ticker, date = ref.date, adjusted = price.adjusted, 
+         adj_return_wkly = ret.adjusted.prices)
 
-# prices_raw %>% filter(ticker == "PLTR")
+prices_weekly_raw %>% filter(ticker == "AAPL")
+prices_weekly_raw %>% filter(ticker == "PLTR")
+
+
+files_prices_monthly <- 
+  list.files(
+    "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/cleaned data",
+    pattern = "^prices_monthly_\\d{1,6}\\_\\d{1,6}", 
+    full.names = TRUE)
+max_date <- 
+  files_prices_monthly %>% 
+  str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
+  flatten_chr() %>% 
+  max()
+
+files_prices_monthly <- files_prices_monthly %>% str_subset(max_date)
+
+prices_monthly_raw <- 
+  files_prices_monthly %>% 
+  map_df(~read_tibble(.x, colClasses = c('price.adjusted' = 'character'))) %>% 
+  mutate(price.adjusted = as.numeric(price.adjusted)) %>% 
+  select(ticker, date = ref.date, adjusted = price.adjusted, 
+         adj_monthly_wkly = ret.adjusted.prices)
+
+prices_monthly_raw %>% filter(ticker == "AAPL")
+prices_monthly_raw %>% filter(ticker == "PLTR")
 
 
 
 
-!!!!!prices_daily to prices_weekly
+!!! merge with monthly dates (separate file   daily/weekly dates can be used for sd calcs, etc., but monthly dates are good for combinging with fundamentals           
 
-prices_daily_last_10y <-
+
+
+
+
+
+
+prices_weekly_last_10y <-
       prices_raw %>% 
       filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
       group_by(ticker) %>% 
-      mutate(return_daily_adj = adjusted / lag(adjusted) - 1) %>% 
+      mutate(return_weekly_adj = adjusted / lag(adjusted) - 1) %>% 
       # mutate(sd_adj_returns_annualized = slide_dbl(return_daily_adj, sd, .before = 251) * sqrt(???)) %>% 
       mutate(price_index = adjusted / first(adjusted)) %>% 
       ungroup() %>% 
       select(ticker, date, everything())
 
 # Save
-fwrite(prices_daily_last_10y, paste0(dir_data, "cleaned data/prices_daily_last_10y (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(prices_weekly_last_10y, paste0(dir_data, "cleaned data/prices_daily_last_10y (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
 # Add RSI and stochastic signals
 prices_monthly <- 
     prices_raw %>%
-      group_by(ticker) %>% 
+    group_by(ticker) %>% 
     mutate(return_monthly_adj = adjusted / lag(adjusted) - 1) %>% 
     mutate(sd_adj_returns_annualized = slide_dbl(return_monthly_adj, sd, .before = 11) * sqrt(12)) %>% 
     # Round report_period dates to nearest month-end
