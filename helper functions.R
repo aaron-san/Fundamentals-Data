@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
     library(slider) # slide_dbl()
 })
 
-dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/"
 
 
 
