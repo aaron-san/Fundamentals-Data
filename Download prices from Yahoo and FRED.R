@@ -11,7 +11,7 @@ library(data.table)
 library(lubridate)
 
 
-dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data/"
 tickers <- read_excel(paste0(dir_data, "Tickers.xlsx"), sheet = 1) %>% 
     pull(Ticker)
 
@@ -59,7 +59,8 @@ library(quantmod)
 library(readxl)
 library(data.table)
 
-symbols <- read_excel(paste0(dir_data, "FRED Tickers.xlsx"), col_names = TRUE, sheet = 1, range = "A1:B100") %>% 
+symbols <- read_excel(paste0(dir_data, "FRED Tickers.xlsx"), 
+                      col_names = TRUE, sheet = 1, range = "A1:B100") %>% 
     drop_na("FRED Symbol") %>% 
     pull("FRED Symbol") %>% 
     .[. != "USDX"]
@@ -69,8 +70,8 @@ symbols <- read_excel(paste0(dir_data, "FRED Tickers.xlsx"), col_names = TRUE, s
 #   "DGS7", "DGS10", "DGS20", "DGS30")
 
 # Get data for all tickers
-prices_econ <- getSymbols(symbols, src = "FRED", from = "1975-12-31")#,
-                          # auto.assign = FALSE)
+# prices_econ <- getSymbols(symbols, src = "FRED", from = "1975-12-31")#,
+#                           # auto.assign = FALSE)
 
 Stocks <- lapply(symbols, function(sym) {
     na.omit(getSymbols(sym, src = "FRED", from = "1975-12-31", auto.assign=FALSE))
@@ -100,18 +101,25 @@ library(tidyverse)
 library(lubridate)
 library(BatchGetSymbols)
 
-dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data-data/"
-tickers <- read_lines(paste0(dir_data, "cleaned data/tickers_with_clean_prices.txt")) %>% 
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data/"
+tickers <- 
+    read_lines(paste0(dir_data, 
+                      "cleaned data/tickers_with_clean_prices.txt")) %>% 
     {.[. != "NA"]}
 
+# 13,764 tickers !!!
+
+tickers_in_fundamentals <- 
+    read_tibble(paste0(dir_data, "cleaned data/fundamentals_consolidated.csv")) %>% 
+    distinct(ticker) %>% pull()
 
 
-# !!! tickers in fundamentals????
+
 # tickers <- sample(tickers, 5)
 
 options(future.rng.onMisuse = "ignore")
 
-get_and_save_prices <- function(rng = 1:100) {
+download_Yhoo_prices <- function(rng = 1:100) {
     # RNGkind("L'Ecuyer-CMRG")
     future::plan(future::multisession, workers = floor(parallel::detectCores()/2))
     prices_fund <- BatchGetSymbols(tickers = na.omit(tickers[rng]),
@@ -123,9 +131,14 @@ get_and_save_prices <- function(rng = 1:100) {
                                    be.quiet = TRUE)
     
     # Save
-    data.table::fwrite(prices_fund$df.tickers, paste0(dir_data, "cleaned data/prices_monthly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))
-    data.table::fwrite(prices_fund$df.control, paste0(dir_data, "cleaned data/df_control - prices_monthly_", first(rng), "_", last(rng), " (", today() %>% str_replace_all("-", " "), ").csv"))    
-    
+    data.table::fwrite(prices_fund$df.tickers, 
+                       paste0(dir_data, "cleaned data/prices_monthly_", first(rng),
+                              "_", last(rng), " (", today() %>% 
+                                  str_replace_all("-", " "), ").csv"))
+    data.table::fwrite(prices_fund$df.control, 
+                       paste0(dir_data, "cleaned data/df_control - prices_monthly_",
+                              first(rng), "_", last(rng), " (", today() %>%
+                                  str_replace_all("-", " "), ").csv"))
 }
 
 
@@ -138,12 +151,30 @@ end[length(end)] <- min(length(tickers), end[length(end)])
 # end <- end[end > 10200]
 
 for(i in seq_along(start)) {
-    get_and_save_prices(rng = start[i]:end[i])
+    download_Yhoo_prices(rng = start[i]:end[i])
     print(paste0(start[i], "-", end[i], " done!"))
 } 
 
 
-# !!!!! Code to delete old price files
+!!!!! Code to delete old price files
+# files_control <- list.files("data/cleaned data", full.names = TRUE, 
+#                             pattern = "df_control") 
+# 
+# file_dates <- files_control %>% 
+#     str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% flatten_chr() %>% 
+#     as.Date("%Y %m %d")
+# 
+# dates_to_keep <- file_dates[file_dates > (Sys.Date() - days(14))] %>% unique()
+# 
+# files_control[str_detect(files_control, as.character(dates_to_keep))]
+# 
+# 
+# # Find the control files for the most recent download date
+# delete_lgl <- files_control %>% str_detect(max_date) %>% map_lgl(isFALSE)
+# files_control[delete_lgl]
+# file.remove()
+
+
 
 
 

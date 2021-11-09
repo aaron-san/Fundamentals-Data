@@ -365,14 +365,12 @@ graphfund_income_statements_quarterly <-
   read_tibble(is_data_file) %>% 
   rename(report_date = date) %>% 
   mutate(cost_of_revenue = abs(cost_of_revenue),
-         total_operating_expense = abs(total_operating_expenses)) %>% 
-  mutate(net_interest_income = 
-           coalesce(net_interest_income, -net_interest_paid)) %>%  
-  select(-net_interest_paid)
+         total_operating_expense = abs(total_operating_expenses))
 
 graphfund_cashflows_quarterly <- 
   read_tibble(cf_data_file) %>% 
-  rename(report_date = date)
+  rename(report_date = date) %>% 
+  select(-net_interest_paid)
 
 
 #--------------------------#
@@ -1061,7 +1059,7 @@ net_income_common <-
                          input_data %>% 
                            select(ticker, report_date,
                                   input_data_net_income_common_1Q =
-                                    net_income_common_1Q)) %>%
+                                    net_income_common_1Q))) %>%
   transmute(ticker, report_date, 
             net_income_common_1Y = 
               coalesce(factset_net_income_common_1Y, 
@@ -1167,12 +1165,17 @@ cash_from_operating_activities <-
                          input_data %>% 
                            select(ticker, report_date,
                                   input_data_cash_from_operating_activities_1Q =
-                                    cash_from_operating_activities_1Q))) %>%
+                                    cash_from_operating_activities_1Q),
+                         graphfund_cashflows_quarterly %>%
+                           select(ticker, report_date,
+                                  graphfund_cash_from_operating_activities_1Q =
+                                    net_cash_provided_by_operating_activities))) %>%
   # mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>%
   transmute(ticker, report_date,
             cash_from_operating_activities_1Q = 
               coalesce(edgar_cash_from_operating_activities_1Q,
-                       simfin_cash_from_operating_activities_1Q,                                         input_data_cash_from_operating_activities_1Q),
+                       simfin_cash_from_operating_activities_1Q,                                          input_data_cash_from_operating_activities_1Q,
+                       graphfund_cash_from_operating_activities_1Q),
             cash_from_operating_activities_1Y = 
               coalesce(factset_cash_from_operating_activities_1Y,
                        yhoo_cash_from_operating_activities_1Y,
@@ -1206,17 +1209,20 @@ cash_from_investing_activities <-
                          input_data %>% 
                 select(ticker, report_date,
                        input_data_cash_from_investing_activities_1Y = 
-                         cash_from_investing_activities_1Y),
-                         input_data %>% 
-                select(ticker, report_date,
+                         cash_from_investing_activities_1Y,
                        input_data_cash_from_investing_activities_1Q =
-                         cash_from_investing_activities_1Q))) %>%
+                         cash_from_investing_activities_1Q),
+              graphfund_cashflows_quarterly %>%
+                select(ticker, report_date,
+                       graphfund_cash_from_investing_activities_1Q =
+                         net_cash_provided_by_investing_activities))) %>%
   # mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>%
   transmute(ticker, report_date,
             cash_from_investing_activities_1Q = 
               coalesce(edgar_cash_from_investing_activities_1Q,
                        simfin_cash_from_investing_activities_1Q,
-                       input_data_cash_from_investing_activities_1Q),
+                       input_data_cash_from_investing_activities_1Q,
+                       graphfund_cash_from_investing_activities_1Q),
             cash_from_investing_activities_1Y = 
               coalesce(yhoo_cash_from_investing_activities_1Y,
                        simfin_cash_from_investing_activities_1Y,
@@ -1248,15 +1254,20 @@ cash_from_financing_activities <-
                            select(ticker, report_date,
                                   input_data_cash_from_financing_activities_1Y =
                                     cash_from_financing_activities_1Y),
-                         input_data %>% 
-                           select(ticker, report_date,
-                                  input_data_cash_from_financing_activities_1Q =
-                                    cash_from_financing_activities_1Q))) %>%
+              input_data %>% 
+                select(ticker, report_date,
+                       input_data_cash_from_financing_activities_1Q =
+                         cash_from_financing_activities_1Q),
+              graphfund_cashflows_quarterly %>%
+                select(ticker, report_date,
+                       graphfund_cash_from_financing_activities_1Q =
+                         net_cash_provided_by_financing_activities))) %>%
   transmute(ticker, report_date,
             cash_from_financing_activities_1Q = 
               coalesce(edgar_cash_from_financing_activities_1Q,
                        simfin_cash_from_financing_activities_1Q,
-                       input_data_cash_from_financing_activities_1Q),
+                       input_data_cash_from_financing_activities_1Q,
+                       graphfund_cash_from_financing_activities_1Q),
             cash_from_financing_activities_1Y = 
               coalesce(yhoo_cash_from_financing_activities_1Y,
                        simfin_cash_from_financing_activities_1Y,
@@ -1265,45 +1276,110 @@ cash_from_financing_activities <-
   remove_duplicates()
 
 # Consolidate depreciation_amortization  
-depreciation_amortization   <-
-  Reduce(full_join, list(simfin_cash_flow_statements_yearly %>% select(ticker, report_date, simfin_depreciation_amortization_1Y = depreciation_amortization),
-                         simfin_cash_flow_statements_quarterly %>% select(ticker, report_date, simfin_depreciation_amortization_1Q = depreciation_amortization),
-                         factset_cash_flow_statements_yearly %>% select(ticker, report_date, factset_depreciation_amortization_1Y = depreciation),
-                         yhoo_cash_flow_statements_yearly %>% select(ticker, report_date, yhoo_depreciation_amortization_1Y = depreciation),
-                         input_data %>% select(ticker, report_date, input_data_depreciation_amortization_1Y = depreciation_amortization_1Y),
-                         input_data %>% select(ticker, report_date, input_data_depreciation_amortization_1Q = depreciation_amortization_1Q))) %>% 
+depreciation_amortization <- 
+  Reduce(full_join, list(simfin_cash_flow_statements_yearly %>% 
+                           select(ticker, report_date,
+                                  simfin_depreciation_amortization_1Y =
+                                    depreciation_amortization),
+                         simfin_cash_flow_statements_quarterly %>% 
+                           select(ticker, report_date,
+                                  simfin_depreciation_amortization_1Q =
+                                    depreciation_amortization),
+                         factset_cash_flow_statements_yearly %>% 
+                           select(ticker, report_date,
+                                  factset_depreciation_amortization_1Y =
+                                    depreciation),
+                         yhoo_cash_flow_statements_yearly %>% 
+                           select(ticker, report_date,
+                                  yhoo_depreciation_amortization_1Y = 
+                                    depreciation),
+                         input_data %>% 
+                           select(ticker, report_date,
+                                  input_data_depreciation_amortization_1Y =
+                                    depreciation_amortization_1Y),
+                         input_data %>% 
+                           select(ticker, report_date,
+                                  input_data_depreciation_amortization_1Q =
+                                    depreciation_amortization_1Q))) %>% 
   # mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>%
   transmute(ticker, report_date,
-            depreciation_amortization_1Q = coalesce(simfin_depreciation_amortization_1Q, input_data_depreciation_amortization_1Q),
-            depreciation_amortization_1Y = coalesce(factset_depreciation_amortization_1Y, yhoo_depreciation_amortization_1Y, simfin_depreciation_amortization_1Y, input_data_depreciation_amortization_1Y)) %>% 
+            depreciation_amortization_1Q = 
+              coalesce(simfin_depreciation_amortization_1Q,
+                       input_data_depreciation_amortization_1Q),
+            depreciation_amortization_1Y = 
+              coalesce(factset_depreciation_amortization_1Y,
+                       yhoo_depreciation_amortization_1Y,
+                       simfin_depreciation_amortization_1Y,
+                       input_data_depreciation_amortization_1Y)) %>% 
   remove_duplicates()
 
 
 # Consolidate cash_from_repurchase_of_equity  
-cash_from_repurchase_of_equity   <-
-  Reduce(full_join, list(simfin_cash_flow_statements_yearly %>% select(ticker, report_date, simfin_cash_from_repurchase_of_equity_1Y = cash_from_repurchase_of_equity),
-                         simfin_cash_flow_statements_quarterly %>% select(ticker, report_date, simfin_cash_from_repurchase_of_equity_1Q = cash_from_repurchase_of_equity),
-                         factset_cash_flow_statements_yearly %>% mutate(factset_cash_from_repurchase_of_equity_1Y = issuance_of_stock - repurchase_of_stock) %>% select(ticker, report_date, factset_cash_from_repurchase_of_equity_1Y),
-                         yhoo_cash_flow_statements_yearly %>% mutate(yhoo_cash_from_repurchase_of_equity_1Y = issuance_of_stock - repurchase_of_stock) %>% select(ticker, report_date, yhoo_cash_from_repurchase_of_equity_1Y),
-                         input_data %>% select(ticker, report_date, input_data_cash_from_repurchase_of_equity_1Y = cash_from_repurchase_of_equity_1Y),
-                         input_data %>% select(ticker, report_date, input_data_cash_from_repurchase_of_equity_1Q = cash_from_repurchase_of_equity_1Q))) %>% 
+cash_from_repurchase_of_equity <-
+  Reduce(full_join, list(simfin_cash_flow_statements_yearly %>% 
+                           select(ticker, report_date,
+                                  simfin_cash_from_repurchase_of_equity_1Y =
+                                    cash_from_repurchase_of_equity),
+                         simfin_cash_flow_statements_quarterly %>% 
+                           select(ticker, report_date,
+                                  simfin_cash_from_repurchase_of_equity_1Q =
+                                    cash_from_repurchase_of_equity),
+                         factset_cash_flow_statements_yearly %>% 
+                           mutate(factset_cash_from_repurchase_of_equity_1Y =
+                                    issuance_of_stock - repurchase_of_stock) %>%
+                           select(ticker, report_date,
+                                  factset_cash_from_repurchase_of_equity_1Y),
+                         yhoo_cash_flow_statements_yearly %>% 
+                           mutate(yhoo_cash_from_repurchase_of_equity_1Y =
+                                    issuance_of_stock - repurchase_of_stock) %>%
+                           select(ticker, report_date,
+                                  yhoo_cash_from_repurchase_of_equity_1Y),
+                         input_data %>% 
+                           select(ticker, report_date,
+                                  input_data_cash_from_repurchase_of_equity_1Y =
+                                    cash_from_repurchase_of_equity_1Y,
+                                  input_data_cash_from_repurchase_of_equity_1Q =
+                                    cash_from_repurchase_of_equity_1Q))) %>% 
   transmute(ticker, report_date,
-            cash_from_repurchase_of_equity_1Q = coalesce(simfin_cash_from_repurchase_of_equity_1Q, input_data_cash_from_repurchase_of_equity_1Q),
-            cash_from_repurchase_of_equity_1Y = coalesce(factset_cash_from_repurchase_of_equity_1Y, yhoo_cash_from_repurchase_of_equity_1Y, simfin_cash_from_repurchase_of_equity_1Y, input_data_cash_from_repurchase_of_equity_1Y)) %>% 
+            cash_from_repurchase_of_equity_1Q = 
+              coalesce(simfin_cash_from_repurchase_of_equity_1Q,
+                       input_data_cash_from_repurchase_of_equity_1Q),
+            cash_from_repurchase_of_equity_1Y = 
+              coalesce(factset_cash_from_repurchase_of_equity_1Y,
+                       yhoo_cash_from_repurchase_of_equity_1Y,
+                       simfin_cash_from_repurchase_of_equity_1Y,
+                       input_data_cash_from_repurchase_of_equity_1Y)) %>% 
   remove_duplicates()
 
 
 
 # Consolidate net_income from cash flow data
 net_income <-
-  Reduce(full_join, list(simfin_cash_flow_statements_yearly %>% select(ticker, report_date, simfin_net_income_1Y = net_income_starting_line),
-                         simfin_cash_flow_statements_quarterly %>% select(ticker, report_date, simfin_net_income_1Q = net_income_starting_line),
-                         yhoo_cash_flow_statements_yearly %>% select(ticker, report_date, yhoo_net_income_1Y = net_income),
-                         input_data %>% select(ticker, report_date, input_data_net_income_1Y = net_income_1Y),
-                         input_data %>% select(ticker, report_date, input_data_net_income_1Q = net_income_1Q))) %>%
+  Reduce(full_join, list(simfin_cash_flow_statements_yearly %>% 
+                           select(ticker, report_date, 
+                                  simfin_net_income_1Y = net_income_starting_line),
+                         simfin_cash_flow_statements_quarterly %>% 
+                           select(ticker, report_date, 
+                                  simfin_net_income_1Q = net_income_starting_line),
+                         yhoo_cash_flow_statements_yearly %>% 
+                           select(ticker, report_date, 
+                                  yhoo_net_income_1Y = net_income),
+                         input_data %>% 
+                           select(ticker, report_date, 
+                                  input_data_net_income_1Y = net_income_1Y),
+                         input_data %>% 
+                           select(ticker, report_date, 
+                                  input_data_net_income_1Q = net_income_1Q),
+                         graphfund_cashflows_quarterly %>%
+                           select(ticker, report_date,
+                                  graphfund_net_income_1Q = net_income))) %>%
   transmute(ticker, report_date,
-            net_income_1Q = coalesce(simfin_net_income_1Q, input_data_net_income_1Q),
-            net_income_1Y = coalesce(yhoo_net_income_1Y, simfin_net_income_1Y, input_data_net_income_1Y)) %>% 
+            net_income_1Q = coalesce(simfin_net_income_1Q, 
+                                     input_data_net_income_1Q,
+                                     graphfund_net_income_1Q),
+            net_income_1Y = coalesce(yhoo_net_income_1Y, 
+                                     simfin_net_income_1Y, 
+                                     input_data_net_income_1Y)) %>% 
   remove_duplicates()
 
 
@@ -1325,7 +1401,7 @@ cf_consolidated <-
 stopifnot(!cf_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>% any())
 
 # Save to this project's data directory
-fwrite(cf_consolidated, paste0(dir_data, "cleaned data/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(cf_consolidated, paste0(dir_data, "data/cleaned data/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(cf_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -1377,12 +1453,15 @@ source("helper functions.R")
 
 # Profiles (ratios + industry, company names, etc.)
 
-file_edgar_profiles <- list.files(paste0(dir_data, "cleaned data"), pattern = "edgar_profiles", full.names = TRUE)
+file_edgar_profiles <- list.files(paste0(dir_data, "data/cleaned data"), 
+                                  pattern = "edgar_profiles", full.names = TRUE)
 edgar_profile_data <- map_df(file_edgar_profiles, ~read_tibble(.x)) %>% distinct()
 
 
 # Yahoo profile data
-file_yhoo_profiles <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Yahoo-Data/data/cleaned", pattern = "yhoo_profiles", full.names = TRUE) %>% max()
+file_yhoo_profiles <- 
+  list.files("C:/Users/user/Desktop/Aaron/R/Projects/Yahoo-Data/data/cleaned",
+             pattern = "yhoo_profiles", full.names = TRUE) %>% max()
 
 yhoo_profile_data <- 
   read_tibble(file_yhoo_profiles) %>% 
@@ -1393,30 +1472,54 @@ yhoo_profile_data <-
          shares_basic = shares_outstanding) %>% 
   # Rename some fields (to match industry names in YHOO data)
   mutate(industry = industry %>% 
-               str_replace("^coking_coal$", "coal") %>% 
-               str_replace("^consulting_services$", "consulting") %>%
-               str_replace("^drug_manufacturers_general$", "drug_manufacturers") %>% 
-               str_replace("^farm_heavy_construction_machinery$", "farm_construction_machinery") %>% 
-               str_replace("^insurance_diversified$", "insurance") %>% 
-               str_replace("^advertising_agencies$", "advertising_marketing_services") %>% 
-               str_replace("^software_application$", "application_software") %>% 
-               str_replace("^beverages_wineries_distilleries$", "beverages_alcoholic") %>% 
-               str_replace("^apparel_retail$", "retail_apparel_specialty") %>% 
-               str_replace("^specialty_business_services$", "business_services") %>% 
-               str_replace("^consulting_services$", "consulting_services_outsourcing") %>% 
-               str_replace("^medical_instruments_supplies$", "medical_instruments_equipment") %>% 
-               str_replace("^insurance_life$", "insurance_diversified_life") %>% 
-               str_replace("^insurance_property_casualty$", "insurance_diversified_property_casualty") %>% 
-               str_replace("^insurance_specialty$", "insurance_diversified_specialty") %>% 
-               str_replace("^oil_gas_equipment_services$", "oil_gas_services") %>% 
-               str_replace("^building_products_equipment$", "industrial_products") %>% 
-               str_replace("^airports_air_services$", "transportation_logistics") %>% 
-               str_replace("^banks_regional$", "banks") %>% 
-               str_replace("^software_infrastructure$", "software_application") %>% 
-               str_replace("^semiconductor_equipment_materials$", "semiconductors") %>% 
-               str_replace("^scientific_technical_instruments$", "computer_hardware") %>% 
-               str_replace("^leisure$", "travel_leisure") %>% 
-               str_replace("^software_infrastructure$", "online_media"))
+               str_replace("^coking_coal$", 
+                           "coal") %>% 
+               str_replace("^consulting_services$", 
+                           "consulting") %>%
+               str_replace("^drug_manufacturers_general$", 
+                           "drug_manufacturers") %>% 
+               str_replace("^farm_heavy_construction_machinery$",
+                           "farm_construction_machinery") %>% 
+               str_replace("^insurance_diversified$", 
+                           "insurance") %>% 
+               str_replace("^advertising_agencies$",
+                           "advertising_marketing_services") %>% 
+               str_replace("^software_application$", 
+                           "application_software") %>% 
+               str_replace("^beverages_wineries_distilleries$",
+                           "beverages_alcoholic") %>% 
+               str_replace("^apparel_retail$", 
+                           "retail_apparel_specialty") %>% 
+               str_replace("^specialty_business_services$", 
+                           "business_services") %>% 
+               str_replace("^consulting_services$",
+                           "consulting_services_outsourcing") %>% 
+               str_replace("^medical_instruments_supplies$",
+                           "medical_instruments_equipment") %>% 
+               str_replace("^insurance_life$", 
+                           "insurance_diversified_life") %>% 
+               str_replace("^insurance_property_casualty$",
+                           "insurance_diversified_property_casualty") %>% 
+               str_replace("^insurance_specialty$",
+                           "insurance_diversified_specialty") %>% 
+               str_replace("^oil_gas_equipment_services$", 
+                           "oil_gas_services") %>% 
+               str_replace("^building_products_equipment$", 
+                           "industrial_products") %>% 
+               str_replace("^airports_air_services$", 
+                           "transportation_logistics") %>% 
+               str_replace("^banks_regional$", 
+                           "banks") %>% 
+               str_replace("^software_infrastructure$", 
+                           "software_application") %>% 
+               str_replace("^semiconductor_equipment_materials$", 
+                           "semiconductors") %>% 
+               str_replace("^scientific_technical_instruments$",
+                           "computer_hardware") %>% 
+               str_replace("^leisure$", 
+                           "travel_leisure") %>% 
+               str_replace("^software_infrastructure$", 
+                           "online_media"))
            
 
 
@@ -1429,7 +1532,7 @@ simfin_profile_data <-
     mutate(across(c(sector, industry), ~snakecase::to_snake_case(.x)))
 
 # Save to this project's data directory
-fwrite(simfin_profile_data, paste0(dir_data, "cleaned data/simfin_profile_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(simfin_profile_data, paste0(dir_data, "data/cleaned data/simfin_profile_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
 fwrite(simfin_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/simfin_profile_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
@@ -1462,7 +1565,9 @@ rm(simfin_profile_data)
 
     
 # save to this project's data directory
-fwrite(profile_data_consolidated, paste0(dir_data, "cleaned data/profile_data_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(profile_data_consolidated, 
+       paste0(dir_data, "data/cleaned data/profile_data_consolidated (", 
+              Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
@@ -1479,16 +1584,21 @@ source("helper functions.R")
 
 
 # Read data
-profile_data_consolidated_file <- list.files(paste0(dir_data, "cleaned data"), pattern = "^profile_data_consolidated", full.names = TRUE) %>% max()
+profile_data_consolidated_file <- 
+  list.files(paste0(dir_data, "data/cleaned data"), 
+             pattern = "^profile_data_consolidated", full.names = TRUE) %>% max()
 profile_data_consolidated <- read_tibble(profile_data_consolidated_file) 
 
-bs_files <- list.files(paste0(dir_data, "cleaned data"), pattern = "bs_consolidated", full.names = TRUE)
+bs_files <- list.files(paste0(dir_data, "data/cleaned data"), 
+                       pattern = "bs_consolidated", full.names = TRUE)
 bs_consolidated <- map_df(bs_files %>% max(), ~read_tibble(.x))
 
-is_files <- list.files(paste0(dir_data, "cleaned data"), pattern = "is_consolidated", full.names = TRUE)
+is_files <- list.files(paste0(dir_data, "data/cleaned data"), 
+                       pattern = "is_consolidated", full.names = TRUE)
 is_consolidated <- map_df(is_files %>% max(), ~read_tibble(.x))
 
-cf_files <- list.files(paste0(dir_data, "cleaned data"), pattern = "cf_consolidated", full.names = TRUE)
+cf_files <- list.files(paste0(dir_data, "data/cleaned data"), 
+                       pattern = "cf_consolidated", full.names = TRUE)
 cf_consolidated <- map_df(cf_files %>% max(), ~read_tibble(.x))
 
 
@@ -1508,25 +1618,37 @@ objects_that_contain_shares
 shares_basic <-
   Reduce(full_join, 
          list(edgar_income_statements_quarterly %>%
-                select(ticker, report_date = rounded_date, edgar_is_q_shares_basic = shares_basic),
+                select(ticker, report_date = rounded_date, 
+                       edgar_is_q_shares_basic = shares_basic),
               input_data %>% 
-                transmute(ticker, report_date, input_data_shares_basic = coalesce(shares_basic, yhoo_shares_basic)),
+                transmute(ticker, report_date, 
+                          input_data_shares_basic = 
+                            coalesce(shares_basic, yhoo_shares_basic)),
               profile_data_consolidated %>% 
-                filter(!is.na(report_date)) %>% select(ticker, report_date, profile_data_consolidated_shares_basic = shares_basic),
+                filter(!is.na(report_date)) %>% 
+                select(ticker, report_date, 
+                       profile_data_consolidated_shares_basic = shares_basic),
               simfin_balance_sheets_quarterly %>% 
-                select(ticker, report_date, simfin_shares_basic_bs_1Q = shares_basic),
+                select(ticker, report_date, 
+                       simfin_shares_basic_bs_1Q = shares_basic),
               simfin_balance_sheets_yearly %>%
-                select(ticker, report_date, simfin_shares_basic_bs_1Y = shares_basic),
+                select(ticker, report_date, 
+                       simfin_shares_basic_bs_1Y = shares_basic),
               simfin_cash_flow_statements_quarterly %>% 
-                select(ticker, report_date, simfin_shares_basic_cf_1Q = shares_basic),
+                select(ticker, report_date, 
+                       simfin_shares_basic_cf_1Q = shares_basic),
               simfin_cash_flow_statements_yearly %>% 
-                select(ticker, report_date, simfin_shares_basic_cf_1Y = shares_basic),
+                select(ticker, report_date, 
+                       simfin_shares_basic_cf_1Y = shares_basic),
               simfin_income_statements_quarterly %>% 
-                select(ticker, report_date, simfin_shares_basic_is_1Q = shares_basic),
+                select(ticker, report_date, 
+                       simfin_shares_basic_is_1Q = shares_basic),
               simfin_income_statements_yearly %>% 
-                select(ticker, report_date, simfin_shares_basic_is_1Y = shares_basic),
+                select(ticker, report_date, 
+                       simfin_shares_basic_is_1Y = shares_basic),
               simfin_shares_basic %>% 
-                select(ticker, report_date = date, simfin_shares_basic = shares_basic))) %>% 
+                select(ticker, report_date = date, 
+                       simfin_shares_basic = shares_basic))) %>% 
   transmute(ticker, report_date,
             shares_basic = coalesce(
               edgar_is_q_shares_basic,
@@ -1556,11 +1678,18 @@ shares_basic <-
 
 # Consolidate net_income fields from is and cf
 net_income <-
-  full_join(is_consolidated %>% select(ticker, rounded_date, is_net_income_1Q = net_income_1Q, is_net_income_1Y = net_income_1Y),
-            cf_consolidated %>% select(ticker, rounded_date, cf_net_income_1Q = net_income_1Q, cf_net_income_1Y = net_income_1Y)) %>% 
+  full_join(is_consolidated %>% 
+              select(ticker, rounded_date, 
+                     is_net_income_1Q = net_income_1Q, 
+                     is_net_income_1Y = net_income_1Y),
+            cf_consolidated %>% 
+              select(ticker, rounded_date, 
+                     cf_net_income_1Q = net_income_1Q, 
+                     cf_net_income_1Y = net_income_1Y)) %>% 
   mutate(net_income_1Q = coalesce(is_net_income_1Q, cf_net_income_1Q),
          net_income_1Y = coalesce(is_net_income_1Y, cf_net_income_1Y)) %>% 
-  select(-is_net_income_1Q, -cf_net_income_1Q, -is_net_income_1Y, -cf_net_income_1Y)
+  select(-is_net_income_1Q, -cf_net_income_1Q, 
+         -is_net_income_1Y, -cf_net_income_1Y)
 
 
 
@@ -1588,10 +1717,7 @@ fundamentals_consolidated <-
   select(-n_vals) %>% 
   setorder(ticker, report_date) %>% 
   as_tibble() %>% 
-  filter(ticker != "") # %>% 
-#   group_by(ticker) %>% 
-#   filter(n() > 3) %>% 
-#   ungroup()
+  filter(ticker != "") 
 
 
 # If there are any duplicate dates for any ticker, stop
@@ -1599,17 +1725,22 @@ if(fundamentals_consolidated %>% select(ticker, report_date) %>% duplicated() %>
 
 
 # Save
-fwrite(fundamentals_consolidated, paste0(dir_data, "cleaned data/fundamentals_consolidated.csv"))
+fwrite(fundamentals_consolidated, 
+       paste0(dir_data, "data/cleaned data/fundamentals_consolidated.csv"))
+
 
 
 # Identify tickers that could not be downloaded cleanly
 #  the last time with BatchGetSymbols
-files_control <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data", full.names = TRUE, pattern = "df_control") 
-max_date <- files_control %>% str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% flatten_chr() %>% max()
+files_control <- list.files("data/cleaned data", full.names = TRUE, 
+                            pattern = "df_control") 
+max_date <- files_control %>% 
+  str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% flatten_chr() %>% max()
+
+# Find the control files for the most recent download date
 files_control <- files_control %>% str_subset(max_date)
 
-tickers_with_dirty_prices <-
-    files_control %>%
+tickers_with_dirty_prices <- files_control %>%
     map_df(~read_tibble(.x) %>% filter(threshold.decision == "OUT")) %>% 
     pull(ticker)
 
@@ -1623,8 +1754,8 @@ tickers_with_clean_prices <-
 length(tickers_with_clean_prices)
 
 # Save list of tickers to use when downloading prices
-write_lines(tickers_with_clean_prices,
-            "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data/data/tickers_with_clean_prices.txt")
+write_lines(tickers_with_clean_prices, 
+            "data/cleaned data/tickers_with_clean_prices.txt")
 
 
 
@@ -1637,7 +1768,8 @@ write_lines(tickers_with_clean_prices,
 # Prices data             #
 #~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-prices_SP500TR_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data", pattern = "Prices from Tickers", full.names = TRUE) %>% max()
+prices_SP500TR_file <- list.files("data", pattern = "Prices from Tickers", 
+                                  full.names = TRUE) %>% max()
 prices_SP500TR <- read_tibble(prices_SP500TR_file, date_format = "%m/%d/%Y") %>% 
       filter(ticker == "^SP500TR")
 
@@ -1660,17 +1792,16 @@ prices_SP500TR_monthly <-
 
 
 # Save
-fwrite(prices_SP500TR_monthly, paste0(dir_data, "cleaned data/", "prices_SP500TR.csv"))
+fwrite(prices_SP500TR_monthly, 
+       paste0(dir_data, "data/cleaned data/", "prices_SP500TR.csv"))
 
 
 
-# !!!! Start here
+
 # Stock prices
-files_prices_weekly <- 
-  list.files(
-    "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data",
-             pattern = "^prices_weekly_\\d{1,6}\\_\\d{1,6}", 
-             full.names = TRUE)
+files_prices_weekly <- list.files("data/cleaned data", 
+                                  pattern = "^prices_weekly_\\d{1,6}\\_\\d{1,6}",
+                                  full.names = TRUE)
 max_date <- 
   files_prices_weekly %>% 
   str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
@@ -1689,11 +1820,9 @@ prices_weekly_raw %>% filter(ticker == "AAPL")
 prices_weekly_raw %>% filter(ticker == "PLTR")
 
 
-files_prices_monthly <- 
-  list.files(
-    "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data",
-    pattern = "^prices_monthly_\\d{1,6}\\_\\d{1,6}", 
-    full.names = TRUE)
+files_prices_monthly <- list.files("data/cleaned data", 
+                                   pattern = "^prices_monthly_\\d{1,6}\\_\\d{1,6}",
+                                   full.names = TRUE)
 max_date <- 
   files_prices_monthly %>% 
   str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
@@ -1715,16 +1844,12 @@ prices_monthly_raw %>% filter(ticker == "PLTR")
 
 
 
-!!! merge with monthly dates (separate file   daily/weekly dates can be used for sd calcs, etc., but monthly dates are good for combinging with fundamentals           
-
-
-
-
-
-
-
+# Weekly prices can be use for sd, drawdown or other metrics.
+!!!!!!!!!!!!!!!!!!
+!!!! # Add RSI and stochastic signals
+!!!!!!!!!!!!!!!!!!
 prices_weekly_last_10y <-
-      prices_raw %>% 
+      prices_weekly_raw %>% 
       filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
       group_by(ticker) %>% 
       mutate(return_weekly_adj = adjusted / lag(adjusted) - 1) %>% 
@@ -1733,17 +1858,18 @@ prices_weekly_last_10y <-
       ungroup() %>% 
       select(ticker, date, everything())
 
-# Save
-fwrite(prices_weekly_last_10y, paste0(dir_data, "cleaned data/prices_daily_last_10y (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+# Save 
+fwrite(prices_weekly_last_10y, 
+       paste0(dir_data, "data/cleaned data/prices_weekly_last_10y (", 
+              Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
-
-# Add RSI and stochastic signals
 prices_monthly <- 
-    prices_raw %>%
+    prices_monthly_raw %>%
     group_by(ticker) %>% 
     mutate(return_monthly_adj = adjusted / lag(adjusted) - 1) %>% 
-    mutate(sd_adj_returns_annualized = slide_dbl(return_monthly_adj, sd, .before = 11) * sqrt(12)) %>% 
+    mutate(sd_adj_returns_annualized = 
+             slide_dbl(return_monthly_adj, sd, .before = 11) * sqrt(12)) %>% 
     # Round report_period dates to nearest month-end
     mutate(rounded_date = round_date(date, unit = "month") - days(1)) %>% 
     mutate(price_index = adjusted / first(adjusted)) %>% 
@@ -1756,44 +1882,42 @@ prices_monthly <-
     ungroup() %>% 
     filter(report_date <= Sys.Date())
 
-# prices_monthly %>% filter(ticker == "PLTR")
-
-
 # Write to csv
-fwrite(prices_monthly, paste0(dir_data, "cleaned data/prices_monthly (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(prices_monthly, paste0(dir_data, "cleaned data/prices_monthly (", 
+                              Sys.Date() %>% str_replace_all("-", " "),
+                              ").csv"))
+
+
+???????????????
+  !!!! Were PLTR prices downloaded?????
+???????????????
+  
+tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
 
 
 
-prices_SP500TR_monthly_file <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data",
-                                          pattern = "prices_SP500TR.csv", full.names = TRUE)
+# S&P 500 Prices
+prices_SP500TR_monthly_file <- list.files("data/cleaned data", 
+                                          pattern = "prices_SP500TR.csv", 
+                                          full.names = TRUE)
 prices_SP500TR_monthly <- read_tibble(prices_SP500TR_monthly_file)
 
 
 
 
-
-
-# Read saved prices_monthly
-file_prices_monthly <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data",
-                                pattern = "prices_monthly \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
-prices_monthly <- read_tibble(file_prices_monthly)
-
-tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
-
-
 #-----------------------------------------#
 # Part 10 - Merge Prices and Fundamentals
 #-----------------------------------------#
-fundamentals_consolidated <- read_tibble(paste0(dir_data, "cleaned data/fundamentals_consolidated.csv"))
+fundamentals_consolidated <- 
+  read_tibble("data/cleaned data/fundamentals_consolidated.csv")
 
+fundamentals_consolidated %>% filter(ticker == "PLTR")
 
 # Filter out tickers that have no price data
 fundamentals_with_prices <-
   fundamentals_consolidated %>%
   filter(ticker %in% tickers_from_prices)
 
-
-fundamentals_with_prices %>% filter(ticker == "PLTR")
 
 # Fill date range
 # full_date_set <- sort(Sys.Date() %>% floor_date(unit = "month") - months(0:(12*30)) - days(1))
