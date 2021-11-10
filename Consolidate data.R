@@ -1814,10 +1814,10 @@ prices_weekly_raw <-
   files_prices_weekly %>% 
   map_df(~read_tibble(.x)) %>%  
   select(ticker, date = ref.date, adjusted = price.adjusted, 
-         adj_return_wkly = ret.adjusted.prices)
+         adj_return_weekly = ret.adjusted.prices)
 
-prices_weekly_raw %>% filter(ticker == "AAPL")
-prices_weekly_raw %>% filter(ticker == "PLTR")
+# prices_weekly_raw %>% filter(ticker == "AAPL")
+# prices_weekly_raw %>% filter(ticker == "PLTR")
 
 
 files_prices_monthly <- list.files("data/cleaned data", 
@@ -1836,27 +1836,57 @@ prices_monthly_raw <-
   map_df(~read_tibble(.x, colClasses = c('price.adjusted' = 'character'))) %>% 
   mutate(price.adjusted = as.numeric(price.adjusted)) %>% 
   select(ticker, date = ref.date, adjusted = price.adjusted, 
-         adj_monthly_wkly = ret.adjusted.prices)
+         adj_return_monthly = ret.adjusted.prices)
 
-prices_monthly_raw %>% filter(ticker == "AAPL")
-prices_monthly_raw %>% filter(ticker == "PLTR")
+# prices_monthly_raw %>% filter(ticker == "AAPL")
+# prices_monthly_raw %>% filter(ticker == "PLTR")
 
 
 
 
 # Weekly prices can be use for sd, drawdown or other metrics.
-!!!!!!!!!!!!!!!!!!
-!!!! # Add RSI and stochastic signals
-!!!!!!!!!!!!!!!!!!
+RSI_n <- function(x, n) {
+  if(length(x) > n + 1) {
+    rsi <- TTR::RSI(x, n = n)
+  } else {
+    rsi <- NA
+  }
+}
+
+price_index_n <- function(x, n) {
+  if(length(x) > n + 1) {
+    price_index <- signif(x / runMax(x, n = n), digits = 2)
+  } else {
+    price_index <- NA
+  }
+}
+
+
+max_drawdown <- function(rets) {
+  rets_index <- cumprod(1 + rets)
+  drawdown <- 1 - rets_index/cummax(rets_index)
+  max_dd <- max(1 - rets_index/cummax(rets_index))
+}
+
+
+
 prices_weekly_last_10y <-
-      prices_weekly_raw %>% 
-      filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
-      group_by(ticker) %>% 
-      mutate(return_weekly_adj = adjusted / lag(adjusted) - 1) %>% 
-      # mutate(sd_adj_returns_annualized = slide_dbl(return_daily_adj, sd, .before = 251) * sqrt(???)) %>% 
-      mutate(price_index = adjusted / first(adjusted)) %>% 
-      ungroup() %>% 
-      select(ticker, date, everything())
+  prices_weekly_raw %>% 
+  as.data.table() %>% 
+  setorder(ticker, date) %>% 
+  unique() %>% 
+  as_tibble() %>% 
+  drop_na() %>%
+  filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
+  group_by(ticker) %>%
+  # filter(ticker == "INST") %>%
+  mutate(RSI_13wk = RSI_n(adjusted, n = 13),
+         price_index_13wk = price_index_n(adjusted, n = 13),
+         max_drawdown_13wk = slide_dbl(adj_return_wkly, 
+                                       ~max_drawdown(.x), .before = n - 1)) %>%
+  # mutate(price_index = adjusted / first(adjusted)) %>% 
+  ungroup() %>% 
+  select(ticker, date, everything())
 
 # Save 
 fwrite(prices_weekly_last_10y, 
@@ -1867,13 +1897,13 @@ fwrite(prices_weekly_last_10y,
 prices_monthly <- 
     prices_monthly_raw %>%
     group_by(ticker) %>% 
-    mutate(return_monthly_adj = adjusted / lag(adjusted) - 1) %>% 
+    # mutate(return_monthly_adj = adjusted / lag(adjusted) - 1) %>% 
     mutate(sd_adj_returns_annualized = 
-             slide_dbl(return_monthly_adj, sd, .before = 11) * sqrt(12)) %>% 
+             slide_dbl(adj_return_monthly, sd, .before = 11) * sqrt(12)) %>% 
     # Round report_period dates to nearest month-end
     mutate(rounded_date = round_date(date, unit = "month") - days(1)) %>% 
     mutate(price_index = adjusted / first(adjusted)) %>% 
-    select(-date, -return_monthly_adj) %>% 
+    select(-date, -adj_return_monthly) %>% 
     select(ticker, report_date = rounded_date, everything()) %>%
     # Rounding the dates sometimes creates duplicate dates if the 
     # most recent date is rounded down to the prior month-end, so
@@ -1888,10 +1918,9 @@ fwrite(prices_monthly, paste0(dir_data, "cleaned data/prices_monthly (",
                               ").csv"))
 
 
-???????????????
-  !!!! Were PLTR prices downloaded?????
-???????????????
-  
+
+prices_monthly %>% filter(ticker == "PLTR")
+
 tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
 
 
