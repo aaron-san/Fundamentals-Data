@@ -25,16 +25,19 @@ read_tibble <- function(x, date_format = "%Y-%m-%d", ...) {
       ####
       
     x %>%
-        fread(fill = TRUE, ...) %>%
-        as_tibble() %>%
-        mutate(across(where(is.Date), ~as.Date(.x))) %>% 
-        mutate(across(which(sapply(., class) == "integer64" ), as.numeric)) %>% 
-        mutate(across(any_of("date"), ~as.Date(.x, date_format)))
+      fread(fill = TRUE, ...) %>%
+      as_tibble() %>%
+      # Some objects have multiple date classes, so coerce it to "date"    
+      mutate(across(where(is.Date), ~as.Date(.x))) %>% 
+      mutate(across(which(sapply(., class) == "integer64" ), as.numeric)) %>% 
+      mutate(across(any_of("date"), ~as.Date(.x, date_format)))
 }
 
 
+
+
 # Round report date to nearest month-end
-  get_rounded_date <- . %>% 
+get_rounded_date <- . %>% 
     # as_tibble() %>% 
     mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>%
     select(-report_date) %>% 
@@ -51,21 +54,28 @@ read_tibble <- function(x, date_format = "%Y-%m-%d", ...) {
 #  - Arrange descending so the most recent value for two nearby dates appears
 #  - first and then round them both to the nearest month end, then drop the second (more dated value)
 
-remove_duplicates <- . %>% 
-    as.data.table() %>% 
-    setorder(report_date) %>%
-    # Remove rows that have all NAs
-    filter(rowSums(is.na(select(., -c(ticker, report_date)))) != ncol(select(., -c(ticker, report_date)))) %>%
-    setorder(ticker, -report_date) %>% 
-    add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
-    get_rounded_date() %>%
-    setorder(rounded_date, -n_vals) %>%
-    # Remove duplicate instances of a date for a given ticker
-    filter(!duplicated(select(., ticker, rounded_date))) %>% 
-    select(-n_vals) %>% 
-    setorder(ticker, rounded_date) %>% 
-    as_tibble()
-
+remove_duplicates <- function(x) {
+  #####
+  # x <- total_liabilities
+  #####
+  
+  x %>% 
+  as.data.table() %>% 
+  setorder(report_date) %>%
+  # Remove rows that have all NAs
+  filter(rowSums(is.na(select(., -c(ticker, report_date)))) != 
+           ncol(select(., -c(ticker, report_date)))) %>%
+  setorder(ticker, -report_date) %>% 
+  add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
+  get_rounded_date() %>%
+  setorder(rounded_date, -n_vals) %>%
+  # Remove duplicate instances of a date for a given ticker
+  unique(by = c("ticker", "rounded_date")) %>%   
+  select(-n_vals) %>% 
+  setorder(ticker, rounded_date) %>% 
+  as_tibble() %>% 
+  filter(!is.na(ticker))
+}
 
 
 # Fill NAs up to two periods (months)
@@ -99,14 +109,15 @@ read_and_clean <- function(file) {
     # file <- files_prices[1]
     ######
     
-    read_tibble(file) %>% 
-        # as_tibble() %>% 
-        select(ticker, date = ref.date, close = price.close, 
-               adjusted = price.adjusted) %>% 
-        group_by(ticker) %>% 
-        fill(close, adjusted, .direction = "down") %>% 
-        slice(endpoints(date, on = "months")) %>% 
-        arrange(ticker, date)
+    read_tibble(file) %>%
+    select(ticker, date = ref.date, close = price.close, 
+           adjusted = price.adjusted) %>% 
+    group_by(ticker) %>% 
+    fill(close, adjusted, .direction = "down") %>% 
+    slice(endpoints(date, on = "months")) %>% 
+    as.data.table() %>% 
+    setorder(ticker, date) %>%
+    as_tibble()
 }
 
 
@@ -144,13 +155,14 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
         select(-ticker) %>% 
         group_by(fundamentals_date) %>% 
         nest() %>% 
-        mutate(fundamentals_date, data_points = map_dbl(data, ~ncol(.x)*nrow(.x))) %>% 
-        # left_join(data_subset %>% select(-ticker) %>% count(fundamentals_date)) %>% 
+        mutate(fundamentals_date, data_points = 
+                 map_dbl(data, ~ncol(.x)*nrow(.x))) %>% 
         mutate(na_perc = sum(is.na(unlist(data))) / data_points) %>% 
         ungroup() %>% 
-        arrange(fundamentals_date) %>% 
-        
-        mutate(p_na_trailing_n_yrs = slider::slide_dbl(na_perc, sum, .before = 12*date_range_yrs-1, .complete = TRUE)) %>% 
+      as.data.table() %>% setorder(fundamentals_date) %>% as_tibble() %>% 
+      mutate(p_na_trailing_n_yrs = 
+               slider::slide_dbl(na_perc, sum, .before = 12*date_range_yrs-1,
+                                 .complete = TRUE)) %>% 
         slice_min(p_na_trailing_n_yrs) %>% 
         tail(1) %>% 
         {tibble(min_date = .$fundamentals_date - lubridate::years(date_range_yrs), 
@@ -181,15 +193,17 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
     # Clean the sector_yhoo variable by setting sector_yhoo equal to the
     #  first observed value for each ticker
     data_cl_sector <-
-        data_cl_dates %>% 
-        filter(ticker %in% tickers_to_use) %>% 
-        # Set the sector of the ticker to the first observed sector value
-        # (ticker MGPI had two unique sectors)
-        group_by(ticker) %>% 
-        mutate(sector_yhoo = first(sector_yhoo)) %>% 
-        ungroup() %>% 
-        distinct() %>% 
-        arrange(ticker, fundamentals_date)
+      data_cl_dates %>% 
+      filter(ticker %in% tickers_to_use) %>% 
+      # Set the sector of the ticker to the first observed sector value
+      # (ticker MGPI had two unique sectors)
+      group_by(ticker) %>% 
+      mutate(sector_yhoo = first(sector_yhoo)) %>% 
+      ungroup() %>% 
+      as.data.table() %>% 
+      unique() %>% 
+      setorder(ticker, fundamentals_date) %>% 
+      as_tibble()
     
     # If there are any NAs remaining, raise a warning.
     if(data_cl_sector %>% is.na() %>% any()) 
@@ -197,11 +211,14 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
     
     date_diffs <-
         data_cl_sector %>% 
-        arrange(fundamentals_date) %>% 
-        group_by(ticker) %>%
-        select(ticker, fundamentals_date) %>% 
-        mutate(date_diff = as.numeric(fundamentals_date - lag(fundamentals_date))) %>% 
-        # Replace each initial NA with a safe number, 30, so that the row isn't dropped later
+      as.data.table() %>% 
+      setorder(fundamentals_date) %>% 
+      as_tibble() %>% 
+      group_by(ticker) %>%
+      select(ticker, fundamentals_date) %>% 
+      mutate(date_diff = as.numeric(fundamentals_date - lag(fundamentals_date))) %>% 
+      # Replace each initial NA with a safe number, 30, 
+      #  so that the row isn't dropped later
         mutate(date_diff = replace(date_diff, row_number() == 1, 30))
     
     # date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
@@ -217,6 +234,43 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
 
 
 
+get_recent_price_dirs <- function(pattern = "prices",
+                                  period = "daily", 
+                                  dir = "data/cleaned data",
+                                  group_pattern = "[0-9]{1,9}_[0-9]{1,9}") {
+  #####
+  # pattern <- "prices"
+  # freq <- "daily"
+  # group_pattern <- "[0-9]{1,9}_[0-9]{1,9}"
+  # dir <- "data/cleaned data"
+  #####
+  files_prices <- 
+    list.files(dir, 
+               pattern = paste0("^", pattern, ".*_", period, "_", group_pattern),
+               full.names = TRUE)
+  
+  file_dates <- files_prices %>%
+    str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% flatten_chr()
+  
+  max_date <- file_dates %>% max()
+  prior_date <- file_dates[file_dates < max_date] %>% max()
+  files_max_date <- files_prices %>% str_subset(max_date)
+  files_prior_date <- files_prices %>% str_subset(prior_date)
+  groups_in_max_date <-
+    files_prices %>% str_subset(max_date) %>% 
+    str_extract(group_pattern)
+  groups_in_prior_date <- files_prior_date %>% str_extract(group_pattern)
+  
+  files_prior_date_to_use <- files_prior_date %>% 
+    .[!groups_in_prior_date %in% groups_in_max_date]
+  
+  files_prices <-
+    files_max_date %>% 
+    c(files_prior_date_to_use) %>% 
+    sort() %>% unique()
+  
+  return(files_prices)
+}
 
 
 

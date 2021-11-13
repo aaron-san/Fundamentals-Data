@@ -10,6 +10,8 @@ library(BatchGetSymbols)
 library(data.table)
 library(lubridate)
 
+source("helper functions.R")
+
 
 dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data/"
 tickers <- read_excel(paste0(dir_data, "Tickers.xlsx"), sheet = 1) %>% 
@@ -119,26 +121,27 @@ tickers_in_fundamentals <-
 
 options(future.rng.onMisuse = "ignore")
 
-download_Yhoo_prices <- function(rng = 1:100) {
+download_Yhoo_prices <- function(rng = 1:100, start_date = "1999-12-31", 
+                                 period = "monthly") {
     # RNGkind("L'Ecuyer-CMRG")
     future::plan(future::multisession, workers = floor(parallel::detectCores()/2))
     prices_fund <- BatchGetSymbols(tickers = na.omit(tickers[rng]),
                                    last.date = Sys.Date(),
-                                   first.date = "1999-12-31", 
-                                   freq.data = "monthly",
+                                   first.date = start_date, 
+                                   freq.data = period,
                                    do.parallel = TRUE,
                                    thresh.bad.data = 0,
                                    be.quiet = TRUE)
     
     # Save
     data.table::fwrite(prices_fund$df.tickers, 
-                       paste0(dir_data, "cleaned data/prices_monthly_", first(rng),
-                              "_", last(rng), " (", today() %>% 
+                       paste0(dir_data, "cleaned data/prices_", period, "_", 
+                              first(rng), "_", last(rng), " (", today() %>% 
                                   str_replace_all("-", " "), ").csv"))
     data.table::fwrite(prices_fund$df.control, 
-                       paste0(dir_data, "cleaned data/df_control - prices_monthly_",
-                              first(rng), "_", last(rng), " (", today() %>%
-                                  str_replace_all("-", " "), ").csv"))
+                       paste0(dir_data, "cleaned data/df_control - prices_", 
+                              period, "_", first(rng), "_", last(rng), 
+                              " (", today() %>% str_replace_all("-", " "), ").csv"))
 }
 
 
@@ -147,11 +150,30 @@ start <- seq(from = 1, to = length(tickers), by = step)
 end <- start + step - 1
 end[length(end)] <- min(length(tickers), end[length(end)])
 
-# start <- start[start >= 10200]
-# end <- end[end > 10200]
 
+!!!!! 6000-...
+start <- start[start >= 6000]
+end <- end[end > 6000]
+
+# Download monthly prices
 for(i in seq_along(start)) {
-    download_Yhoo_prices(rng = start[i]:end[i])
+    download_Yhoo_prices(rng = start[i]:end[i], period = "monthly",
+                         start_date = "1999-12-31")
+    print(paste0(start[i], "-", end[i], " done!"))
+} 
+
+
+!!!!! 3001-5000
+!!!!! 10000-...
+start <- start[start <= 3000]
+end <- end[end <= 5000]
+# start <- start[start >= 10000]
+# end <- end[end > 10000]
+
+# Download daily prices
+for(i in seq_along(start)) {
+    download_Yhoo_prices(rng = start[i]:end[i], period = "daily", 
+                         start_date = Sys.Date() - years(2))
     print(paste0(start[i], "-", end[i], " done!"))
 } 
 

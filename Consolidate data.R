@@ -310,17 +310,17 @@ edgar_profile_data <-
                            select(ticker, name_is_q = name, 
                                   industry_is_q = industry, 
                                   industry_detail_is_q = industry_detail) %>%
-                           distinct(),
+                           as.data.table() %>% unique() %>% as_tibble(),
                          edgar_balance_sheets_quarterly %>% 
                            select(ticker, name_bs_q = name, 
                                   industry_bs_q = industry, 
                                   industry_detail_bs_q = industry_detail) %>%
-                           distinct(),
+                           as.data.table() %>% unique() %>% as_tibble(),
                          edgar_cash_flow_statements_quarterly %>% 
                            select(ticker, name_cf_q = name, 
                                   industry_cf_q = industry, 
                                   industry_detail_cf_q = industry_detail) %>%
-                           distinct())) %>% 
+                           as.data.table() %>% unique() %>% as_tibble())) %>% 
   transmute(ticker, name = coalesce(name_is_q, name_bs_q, name_cf_q), 
             industry = coalesce(industry_is_q, industry_bs_q, industry_cf_q),
             industry_detail = coalesce(industry_detail_is_q, 
@@ -343,32 +343,48 @@ fwrite(edgar_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stoc
 
 
 #--------------------------#
-#  Part 6 - GraphFundamenals.com data
+#  Part 6 - GraphFundamentals.com data
 #--------------------------#
 
 dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/GraphFundamentals-Data/data/cleaned data"
-bs_data_file <- list.files(dir_r, pattern = "balance_sheets_cleaned", 
-                           full.names = TRUE) %>% max()
-is_data_file <- list.files(dir_r, pattern = "income_statements_cleaned", 
-                           full.names = TRUE) %>% max()
-cf_data_file <- list.files(dir_r, pattern = "cash_flows_cleaned", 
-                           full.names = TRUE) %>% max()
+
+# Balance sheet files
+bs_files <- list.files(dir_r, pattern = "balance_sheets_cleaned", 
+                       full.names = TRUE)
+max_date_bs_files <- bs_files %>% 
+  str_extract("(?<=\\()[0-9]{4} [0-9]{2} [0-9]{2}(?=\\))") %>% max()
+bs_data_file <- bs_files %>% str_subset(max_date_bs_files)
+
+# Income statement files
+is_files <- list.files(dir_r, pattern = "income_statements_cleaned", 
+                       full.names = TRUE)
+max_date_is_files <- is_files %>% 
+  str_extract("(?<=\\()[0-9]{4} [0-9]{2} [0-9]{2}(?=\\))") %>% max()
+is_data_file <- is_files %>% str_subset(max_date_is_files)
+
+# Cash flow files
+cf_files <- list.files(dir_r, pattern = "cash_flows_cleaned", 
+                       full.names = TRUE)
+max_date_cf_files <- cf_files %>% 
+  str_extract("(?<=\\()[0-9]{4} [0-9]{2} [0-9]{2}(?=\\))") %>% max()
+cf_data_file <- cf_files %>% str_subset(max_date_cf_files)
+
 
 graphfund_balance_sheets_quarterly <- 
-  read_tibble(bs_data_file) %>% 
+  map_df(bs_data_file, read_tibble) %>% 
   rename(report_date = date) %>% 
   mutate(goodwill = replace_na(goodwill, 0),
          other_intangible_assets_excluding_goodwill = 
            replace_na(other_intangible_assets_excluding_goodwill, 0))
 
 graphfund_income_statements_quarterly <- 
-  read_tibble(is_data_file) %>% 
+  map_df(is_data_file, read_tibble) %>% 
   rename(report_date = date) %>% 
   mutate(cost_of_revenue = abs(cost_of_revenue),
          total_operating_expense = abs(total_operating_expenses))
 
 graphfund_cashflows_quarterly <- 
-  read_tibble(cf_data_file) %>% 
+  map_df(cf_data_file, read_tibble) %>% 
   rename(report_date = date) %>% 
   select(-net_interest_paid)
 
@@ -402,34 +418,35 @@ input_data <- read_tibble(input_data_file, date_format = "%m/%d/%Y") %>%
 #~~~~~~~~~~~~~~~~~~~#
 
 
+
 # Consolidate total_liabilities
 total_liabilities <-
   Reduce(full_join, list(yhoo_balance_sheets_quarterly %>% 
                            select(ticker, report_date, 
-                                  yhoo_total_liab_1Q = total_liab),
-                         yhoo_balance_sheets_yearly %>% 
-                           select(ticker, report_date, 
-                                  yhoo_total_liab_1Y = total_liab),
-                         simfin_balance_sheets_quarterly %>% 
-                           select(ticker, report_date, 
-                                  simfin_total_liab_1Q = total_liabilities),
-                         simfin_balance_sheets_yearly %>% 
-                           select(ticker, report_date, 
-                                  simfin_total_liab_1Y = total_liabilities),
-                         factset_balance_sheets_yearly %>% 
-                           select(ticker, report_date, 
-                                  factset_total_liab_1Y = total_liab),
-                         edgar_balance_sheets_quarterly %>% 
-                           select(ticker, report_date, 
-                                  edgar_total_liab_1Q = total_liab),
-                         input_data %>% 
-                           select(ticker, report_date, 
-                                  input_data_total_liabilities = 
-                                    total_liabilities),
-                         graphfund_balance_sheets_quarterly %>% 
-                           select(ticker, report_date, 
-                                  graphfund_total_liabilities = 
-                                    total_liabilities))) %>% 
+                                 yhoo_total_liab_1Q = total_liab),
+                        yhoo_balance_sheets_yearly %>% 
+                          select(ticker, report_date, 
+                                 yhoo_total_liab_1Y = total_liab),
+                        simfin_balance_sheets_quarterly %>% 
+                          select(ticker, report_date, 
+                                 simfin_total_liab_1Q = total_liabilities),
+                        simfin_balance_sheets_yearly %>% 
+                          select(ticker, report_date, 
+                                 simfin_total_liab_1Y = total_liabilities),
+                        factset_balance_sheets_yearly %>% 
+                          select(ticker, report_date, 
+                                 factset_total_liab_1Y = total_liab),
+                        edgar_balance_sheets_quarterly %>% 
+                          select(ticker, report_date, 
+                                 edgar_total_liab_1Q = total_liab),
+                        input_data %>% 
+                          select(ticker, report_date, 
+                                 input_data_total_liabilities = 
+                                   total_liabilities),
+                        graphfund_balance_sheets_quarterly %>% 
+                          select(ticker, report_date, 
+                                 graphfund_total_liabilities = 
+                                   total_liabilities))) %>% 
   transmute(ticker, report_date, 
             total_liabilities = coalesce(edgar_total_liab_1Q, 
                                          factset_total_liab_1Y, 
@@ -445,7 +462,7 @@ total_liabilities <-
 
 # Consolidate total_assets
 total_assets <-
-  Reduce(full_join, list(yhoo_balance_sheets_quarterly %>% 
+  Reduce(list(yhoo_balance_sheets_quarterly %>% 
                            select(ticker, report_date, 
                                   yhoo_total_assets_1Q = total_assets),
                          yhoo_balance_sheets_yearly %>% 
@@ -468,7 +485,8 @@ total_assets <-
                                   input_data_total_assets = total_assets),
                          graphfund_balance_sheets_quarterly %>% 
                            select(ticker, report_date, 
-                                  graphfund_total_assets = total_assets))) %>%
+                                  graphfund_total_assets = total_assets)),
+         full_join) %>%
   transmute(ticker, report_date, 
             total_assets = coalesce(edgar_total_assets_1Q, 
                                     factset_total_assets_1Y, 
@@ -849,8 +867,12 @@ bs_consolidated <-
                          long_term_debt, property_plant_equipment,
                          net_receivables, accounts_payable, 
                          cash_and_short_term_investments)) %>% 
-  select(ticker, rounded_date, everything()) %>% 
-  arrange(ticker, rounded_date)
+  select(ticker, rounded_date, everything()) %>%
+  as.data.table() %>%
+  setorder(ticker, rounded_date) %>% 
+  as_tibble()
+
+
 
 
 # Check for any duplicated dates for a given ticker
@@ -1113,7 +1135,9 @@ is_consolidated <-
                          selling_general_administrative, net_income_common,
                          net_income)) %>% 
   select(ticker, rounded_date, everything()) %>% 
-  arrange(ticker, rounded_date)
+  as.data.table() %>% 
+  setorder(ticker, rounded_date) %>% 
+  as_tibble()
 
 
 
@@ -1392,7 +1416,10 @@ cf_consolidated <-
                          cash_from_repurchase_of_equity,
                          net_income)) %>% 
   select(ticker, rounded_date, everything()) %>% 
-  arrange(ticker, rounded_date)
+  as.data.table() %>% 
+  setorder(ticker, rounded_date) %>% 
+  as_tibble()
+
   
 
 
@@ -1455,7 +1482,8 @@ source("helper functions.R")
 
 file_edgar_profiles <- list.files(paste0(dir_data, "data/cleaned data"), 
                                   pattern = "edgar_profiles", full.names = TRUE)
-edgar_profile_data <- map_df(file_edgar_profiles, ~read_tibble(.x)) %>% distinct()
+edgar_profile_data <- map_df(file_edgar_profiles, ~read_tibble(.x)) %>% 
+  as.data.table() %>% unique() %>% as_tibble()
 
 
 # Yahoo profile data
@@ -1465,7 +1493,7 @@ file_yhoo_profiles <-
 
 yhoo_profile_data <- 
   read_tibble(file_yhoo_profiles) %>% 
-  distinct() %>%
+  as.data.table() %>% unique() %>% as_tibble() %>% 
   rename(report_date = download_date) %>% 
   get_rounded_date() %>% 
   rename(report_date = rounded_date,
@@ -1555,7 +1583,7 @@ profile_data_consolidated <-
     get_rounded_date() %>% 
     rename(report_date = rounded_date) %>% 
   mutate(ticker = str_to_upper(ticker)) %>%  
-  distinct()
+  as.data.table() %>% unique() %>% as_tibble()
    
 # Remove unused objects
 rm(edgar_profile_data)
@@ -1590,16 +1618,16 @@ profile_data_consolidated_file <-
 profile_data_consolidated <- read_tibble(profile_data_consolidated_file) 
 
 bs_files <- list.files(paste0(dir_data, "data/cleaned data"), 
-                       pattern = "bs_consolidated", full.names = TRUE)
-bs_consolidated <- map_df(bs_files %>% max(), ~read_tibble(.x))
+                       pattern = "bs_consolidated", full.names = TRUE) %>% max()
+bs_consolidated <- map_df(bs_files, ~read_tibble(.x))
 
 is_files <- list.files(paste0(dir_data, "data/cleaned data"), 
-                       pattern = "is_consolidated", full.names = TRUE)
-is_consolidated <- map_df(is_files %>% max(), ~read_tibble(.x))
+                       pattern = "is_consolidated", full.names = TRUE) %>% max()
+is_consolidated <- map_df(is_files, ~read_tibble(.x))
 
 cf_files <- list.files(paste0(dir_data, "data/cleaned data"), 
-                       pattern = "cf_consolidated", full.names = TRUE)
-cf_consolidated <- map_df(cf_files %>% max(), ~read_tibble(.x))
+                       pattern = "cf_consolidated", full.names = TRUE) %>% max()
+cf_consolidated <- map_df(cf_files, ~read_tibble(.x))
 
 
 
@@ -1662,14 +1690,15 @@ shares_basic <-
               simfin_shares_basic,
               input_data_shares_basic)) %>% 
   as.data.table() %>% 
-  setorder(ticker, report_date) %>% 
-  unique() %>% 
   drop_na() %>% 
+  unique() %>% 
   add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
   get_rounded_date() %>% 
+  as.data.table() %>% 
   setorder(rounded_date, -n_vals) %>%
   # Remove duplicate instances of a date for a given ticker
-  filter(!duplicated(select(., ticker, rounded_date))) %>% 
+  unique(by = c("ticker", "rounded_date")) %>% 
+  # filter(!duplicated(select(., ticker, rounded_date))) %>% 
   select(-n_vals) %>% 
   setorder(ticker, rounded_date) %>% 
   as_tibble()
@@ -1700,12 +1729,11 @@ fundamentals_consolidated <-
     bs_consolidated,
     shares_basic,
     net_income)) %>% 
-  arrange(ticker, rounded_date) %>% 
   rename(report_date = rounded_date) %>% 
   filter(!is.na(ticker)) %>% 
   as.data.table() %>% 
   unique() %>% 
-  setorder(report_date) %>%
+  setorder(ticker, report_date) %>%
   # Remove rows that have all NAs
   filter(rowSums(is.na(select(., -c(ticker, report_date)))) != ncol(select(., -c(ticker, report_date)))) %>%
   setorder(ticker, -report_date) %>% 
@@ -1732,22 +1760,19 @@ fwrite(fundamentals_consolidated,
 
 # Identify tickers that could not be downloaded cleanly
 #  the last time with BatchGetSymbols
-files_control <- list.files("data/cleaned data", full.names = TRUE, 
-                            pattern = "df_control") 
-max_date <- files_control %>% 
-  str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% flatten_chr() %>% max()
 
-# Find the control files for the most recent download date
-files_control <- files_control %>% str_subset(max_date)
 
-tickers_with_dirty_prices <- files_control %>%
-    map_df(~read_tibble(.x) %>% filter(threshold.decision == "OUT")) %>% 
-    pull(ticker)
+files_control <- get_recent_price_dirs(pattern = "df_control", 
+                                       period = "monthly")
 
+tickers_with_dirty_prices <- 
+  files_control %>%
+  map_df(~read_tibble(.x) %>% filter(threshold.decision == "OUT")) %>% 
+  pull(ticker)
 
 tickers_with_clean_prices <-
-    fundamentals_consolidated %>% 
-    distinct(ticker) %>% 
+  fundamentals_consolidated %>% 
+  distinct(ticker) %>% 
     # Filter out tickers that could not be downloaded cleanly using BatchGetSymbols
     filter(!ticker %in% tickers_with_dirty_prices) %>% 
     pull(ticker)
@@ -1797,48 +1822,47 @@ fwrite(prices_SP500TR_monthly,
 
 
 
-
+#--------------#
 # Stock prices
-files_prices_weekly <- list.files("data/cleaned data", 
-                                  pattern = "^prices_weekly_\\d{1,6}\\_\\d{1,6}",
-                                  full.names = TRUE)
-max_date <- 
-  files_prices_weekly %>% 
-  str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
-  flatten_chr() %>% 
-  max()
+#--------------#
 
-files_prices_weekly <- files_prices_weekly %>% str_subset(max_date)
+# Daily prices
+files_prices_daily <- 
+  get_recent_price_dirs(period = "daily", dir = "data/cleaned data")
+  
 
-prices_weekly_raw <- 
-  files_prices_weekly %>% 
-  map_df(~read_tibble(.x)) %>%  
-  select(ticker, date = ref.date, adjusted = price.adjusted, 
-         adj_return_weekly = ret.adjusted.prices)
+prices_daily_raw <-
+  files_prices_daily %>%
+  map_df(~read_tibble(.x)) %>%
+  select(ticker, date = ref.date, close = price.close, 
+         adjusted = price.adjusted,
+         adj_return_daily = ret.adjusted.prices) %>% 
+  as.data.table() %>% 
+  setorder(ticker, date) %>% 
+  # Remove rows that contain a duplicate ticker-date key
+  # filter(!duplicated(ticker, date)) %>%
+  unique(by = c("ticker", "date")) %>% 
+  as_tibble()
+  
+# prices_daily_raw %>% filter(ticker == "PLTR")
 
-# prices_weekly_raw %>% filter(ticker == "AAPL")
-# prices_weekly_raw %>% filter(ticker == "PLTR")
 
-
-files_prices_monthly <- list.files("data/cleaned data", 
-                                   pattern = "^prices_monthly_\\d{1,6}\\_\\d{1,6}",
-                                   full.names = TRUE)
-max_date <- 
-  files_prices_monthly %>% 
-  str_extract_all("[0-9]{4} [0-9]{2} [0-9]{2}") %>% 
-  flatten_chr() %>% 
-  max()
-
-files_prices_monthly <- files_prices_monthly %>% str_subset(max_date)
+# Monthly prices
+files_prices_monthly <- 
+  get_recent_price_dirs(period = "monthly", dir = "data/cleaned data")
 
 prices_monthly_raw <- 
   files_prices_monthly %>% 
-  map_df(~read_tibble(.x, colClasses = c('price.adjusted' = 'character'))) %>% 
-  mutate(price.adjusted = as.numeric(price.adjusted)) %>% 
-  select(ticker, date = ref.date, adjusted = price.adjusted, 
-         adj_return_monthly = ret.adjusted.prices)
+  map_df(~read_tibble(.x)) %>%
+  select(ticker, date = ref.date, close = price.close, 
+         adjusted = price.adjusted,
+         adj_return_monthly = ret.adjusted.prices) %>% 
+  as.data.table() %>% 
+  setorder(ticker, date) %>%
+  # Remove rows that contain a duplicate ticker-date key
+  unique(by = c("ticker", "date")) %>% 
+  as_tibble()
 
-# prices_monthly_raw %>% filter(ticker == "AAPL")
 # prices_monthly_raw %>% filter(ticker == "PLTR")
 
 
@@ -1870,27 +1894,33 @@ max_drawdown <- function(rets) {
 
 
 
-prices_weekly_last_10y <-
-  prices_weekly_raw %>% 
+prices_daily_ratios <-
+  prices_daily_raw %>% 
   as.data.table() %>% 
   setorder(ticker, date) %>% 
   unique() %>% 
   as_tibble() %>% 
   drop_na() %>%
-  filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
+  # filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
   group_by(ticker) %>%
   # filter(ticker == "INST") %>%
-  mutate(RSI_13wk = RSI_n(adjusted, n = 13),
-         price_index_13wk = price_index_n(adjusted, n = 13),
-         max_drawdown_13wk = slide_dbl(adj_return_wkly, 
-                                       ~max_drawdown(.x), .before = n - 1)) %>%
+  mutate(RSI_14D = RSI_n(adjusted, n = 14),
+         price_index_3Y = adjusted / first(adjusted),
+         max_drawdown_3Y = max_drawdown(adj_return_daily)) %>%
   # mutate(price_index = adjusted / first(adjusted)) %>% 
   ungroup() %>% 
   select(ticker, date, everything())
 
+
+# most_recent_data <-
+#   prices_daily_ratios %>% 
+#   group_by(ticker) %>% 
+#   filter(date == max(date))
+# colnames(most_recent_data) <- c("ticker", paste0("most_recent_", colnames(most_recent_data[, -1])))
+
 # Save 
-fwrite(prices_weekly_last_10y, 
-       paste0(dir_data, "data/cleaned data/prices_weekly_last_10y (", 
+fwrite(prices_daily_ratios, 
+       paste0(dir_data, "data/cleaned data/prices_daily_ratios (", 
               Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
@@ -1904,25 +1934,23 @@ prices_monthly <-
     mutate(rounded_date = round_date(date, unit = "month") - days(1)) %>% 
     mutate(price_index = adjusted / first(adjusted)) %>% 
     select(-date, -adj_return_monthly) %>% 
-    select(ticker, report_date = rounded_date, everything()) %>%
+    select(ticker, rounded_date, everything()) %>%
     # Rounding the dates sometimes creates duplicate dates if the 
     # most recent date is rounded down to the prior month-end, so
     # remove such duplicates in that case
-    filter(!duplicated(report_date)) %>% 
+    filter(!duplicated(rounded_date)) %>% 
     ungroup() %>% 
-    filter(report_date <= Sys.Date())
+    filter(rounded_date <= Sys.Date())
 
-# Write to csv
-fwrite(prices_monthly, paste0(dir_data, "cleaned data/prices_monthly (", 
+# Save
+fwrite(prices_monthly, paste0(dir_data, "data/cleaned data/prices_monthly (", 
                               Sys.Date() %>% str_replace_all("-", " "),
                               ").csv"))
 
+# prices_monthly %>% filter(ticker == "PLTR")
 
-
-prices_monthly %>% filter(ticker == "PLTR")
 
 tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
-
 
 
 # S&P 500 Prices
@@ -1940,7 +1968,7 @@ prices_SP500TR_monthly <- read_tibble(prices_SP500TR_monthly_file)
 fundamentals_consolidated <- 
   read_tibble("data/cleaned data/fundamentals_consolidated.csv")
 
-fundamentals_consolidated %>% filter(ticker == "PLTR")
+# fundamentals_consolidated %>% filter(ticker == "PLTR")
 
 # Filter out tickers that have no price data
 fundamentals_with_prices <-
@@ -1953,13 +1981,15 @@ fundamentals_with_prices <-
 # Slow! ~1 min
 fundamentals_full_dates <- 
     fundamentals_with_prices %>% 
-    group_by(ticker) %>% 
-    # complete(fundamentals_date = full_date_set) %>%
-    complete(report_date = seq.Date(first(report_date), last(report_date), by = "months") %>% round_date(unit = "month") - days(1)) %>%
-    arrange(ticker, report_date)
+    group_by(ticker) %>%
+    complete(report_date = 
+               seq.Date(first(report_date), last(report_date), by = "months") %>%
+               round_date(unit = "month") - days(1)) %>%
+  as.data.table() %>% 
+  setorder(ticker, report_date) %>% 
+  as_tibble()
 
-# !!!! START
-fundamentals_full_dates %>% filter(ticker == "PLTR")
+# fundamentals_full_dates %>% filter(ticker == "PLTR") %>% view()
 
 
 
@@ -2052,19 +2082,21 @@ fundamentals_filled <-
 # fundamentals_filled %>% filter(ticker == "PLTR")
 
 # Save
-# fwrite(fundamentals_filled, paste0(dir_data, "cleaned data/fundamentals_filled (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(fundamentals_filled, paste0(dir_data, "data/cleaned data/fundamentals_filled (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
 #----------#
 # Ratios   
 #----------#
+!!! START here
+
 # Load libraries and helper functions
 source("helper functions.R")
 
 # Read
-# file_fundamentals_filled <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/cleaned data", pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
-# fundamentals_filled <- read_tibble(file_fundamentals_filled)
+file_fundamentals_filled <- list.files("data/cleaned data", pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv", full.names = TRUE) %>% max()
+fundamentals_filled <- read_tibble(file_fundamentals_filled)
 
 # fundamentals_filled %>%
 #   filter(ticker == "AAPL") %>% 
@@ -2276,7 +2308,7 @@ ratios_w_market_caps <-
               rename(decision_date_6m_forward = report_date,
                      decision_total_market_cap_6m_forward = total_market_cap)
     ) %>% 
-  distinct()
+  as.data.table() %>% unique() %>% as_tibble()
 
 
 # Tickers with multiple sector categories
@@ -2490,8 +2522,8 @@ ratios_final %>%
     mutate(field = str_trunc(field, 20)) %>%
   drop_na(value) %>%
   group_by(ticker) %>% 
-    add_count(field) %>%
-    select(-value, -fundamentals_date) %>% 
+  add_count(field) %>%
+  select(-value, -fundamentals_date) %>% 
   arrange(n) %>% 
   distinct() %>%
   mutate(field = reorder(field, -n)) %>% 
