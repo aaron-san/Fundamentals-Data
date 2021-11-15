@@ -2127,11 +2127,6 @@ tickers_to_use <-
 
 
 # Ratios 
-# Slow! ~ 2 min
-start9 <- Sys.time()
-
-
-
 get_ratios <- function(x) {
   
   #### 
@@ -2374,24 +2369,35 @@ get_ratios <- function(x) {
 
 
 get_ratios(x = fundamentals_filled %>% filter(ticker == "AAPL"))
+
+# Slow! ~ 8 min
+start9 <- Sys.time()
 ratios <- get_ratios(fundamentals_filled)
-
-
-    
 end9 <- Sys.time(); end9 - start9
 
 the_end <- Sys.time(); the_end - the_start # ~ 15 mins
+
+
+# Save
+fwrite(ratios, paste0("data/cleaned data/", "ratios ", 
+                      str_replace_all(Sys.Date(), "-", "_"), ".csv"))
+
+
+# Read
+ratios_file <- list.files("data/cleaned data", pattern = "ratios ",
+                          full.names = TRUE) %>% max()
+ratios <- read_tibble(ratios_file)
 
 
 # Liquidity - current ratio, cash ratio, DSO (Avg AR, net / Sales * 365), DPO (Avg. AP, net / COGS * 365),...
 # Solvency - Debt ratio, D/E, Interest coverage ratio (EBIT / interest expense, net), LT debt to assets ratio
 # Profitability - net profit margin, ROA, ROE, Asset turnover
 
-ratios %>% filter(ticker == "PLTR")
+ratios %>% filter(ticker == "PLTR") %>% View()
 ratios %>% distinct(ticker) %>% nrow()
 
 
-profile_data_consolidated_file <- list.files(paste0(dir_data, "cleaned data"), pattern = "^profile_data_consolidated", full.names = TRUE) %>% max()
+profile_data_consolidated_file <- list.files(paste0(dir_data, "data/cleaned data"), pattern = "^profile_data_consolidated", full.names = TRUE) %>% max()
 profile_data <- read_tibble(profile_data_consolidated_file)
 
 
@@ -2411,9 +2417,9 @@ ratios_joined <-
     # filter(!is.na(revenue) & !is.na(total_assets)) %>% 
     # select(!(selling_general_administrative:total_stockholder_equity), total_assets) %>% 
 
-
+d
 # WILL5000INDFC	Wilshire 5000 Total Market;Full Cap Index; Index; Daily; Not seasonally adjusted
-prices_from_FRED <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data", pattern = "Prices from FRED", full.names = TRUE) %>% max()
+prices_from_FRED <- list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data", pattern = "Prices from FRED", full.names = TRUE) %>% max()
 index_WILL5000 <- read_tibble(prices_from_FRED) %>% 
   filter(symbol == "WILL5000INDFC")
 
