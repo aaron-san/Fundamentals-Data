@@ -16,23 +16,31 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/"
 
 read_tibble <- function(x, date_format = "%Y-%m-%d", ...) {
     
-      ####
-      # x <- input_data_file
-      # date_format <- "%m/%d/%Y"
-      # x <- file_yhoo_profiles[1]
-      # date_format <- "%Y_%m_%d"
-      # date_format <- "%Y-%m-%d"
-      ####
+  ####
+  # x <- input_data_profiles_file
+  # x <- input_data_file
+  # x <- files_control[1]
+  # date_format <- "%m/%d/%Y"
+  # x <- file_yhoo_profiles[1]
+  # date_format <- "%Y_%m_%d"
+  # date_format <- "%Y-%m-%d"
       
-    x %>%
-      fread(fill = TRUE, ...) %>%
-      as_tibble() %>%
-      # Some objects have multiple date classes, so coerce it to "date"    
-      mutate(across(where(is.Date), ~as.Date(.x))) %>% 
-      mutate(across(which(sapply(., class) == "integer64" ), as.numeric)) %>% 
-      mutate(across(any_of("date"), ~as.Date(.x, date_format)))
+  # x <-
+  #   list.files("C:/Users/user/Desktop/Aaron/R/Projects/Yahoo-Data/data/cleaned",
+  #              pattern = "yhoo_profiles", full.names = TRUE) %>% max()
+  ####
+  
+  x %>%
+    fread(fill = TRUE, integer64 = "double", data.table = FALSE) %>%
+    as_tibble() %>% 
+    # Some objects have multiple date classes, so coerce it to "date"    
+    mutate(across(where(is.Date), ~as.Date(.x))) %>% 
+    mutate(across(which(sapply(., class) == "integer64"), as.numeric)) %>% 
+    mutate(across(where(is.integer), ~as.double(.x))) %>% 
+    mutate(across(contains("date"), ~as.Date(.x, date_format))) %>%
+    # Remove empty columns
+    janitor::remove_empty(which = "cols")
 }
-
 
 
 
@@ -125,10 +133,10 @@ read_and_clean <- function(file) {
 
 # Given tickers and fields, find a complete series of data, if it exists
 # Reduce range of tickers and dates to get a complete series for a given field
-get_complete_series <- function(data, fields, date_range_yrs = 5) {
+get_complete_series <- function(data, fields, years = 5) {
     #######
     # data <- ratios_final
-    # date_range_yrs <- 3
+    # years <- 8
     # fields <- fields_to_use
     
     # fields <- c("ticker", "fundamentals_date", "sector_yhoo",
@@ -142,93 +150,107 @@ get_complete_series <- function(data, fields, date_range_yrs = 5) {
     #            "total_accruals_to_total_assets")
     #######
     
-    # Choose the columns specified
-    data_subset <-
-        data %>% 
-        select(ticker, fundamentals_date, any_of(fields))
+  # Find tickers that have at least the required years
+  tickers_to_keep <-
+    data %>% 
+    count(ticker) %>% 
+    filter(n >= years*12) %>% 
+    pull(ticker)
+  
+  # Choose the columns specified
+  data_subset <-
+    data %>% 
+    select(ticker, report_date, any_of(fields)) %>% 
+    filter(ticker %in% tickers_to_keep)
+  
     
-    
-    # Search through all possible time spans of length "date_range_yrs" and
-    #  find the date range with the fewest NAs
-    date_range_w_least_nas <-
-        data_subset %>%
-        select(-ticker) %>% 
-        group_by(fundamentals_date) %>% 
-        nest() %>% 
-        mutate(fundamentals_date, data_points = 
-                 map_dbl(data, ~ncol(.x)*nrow(.x))) %>% 
-        mutate(na_perc = sum(is.na(unlist(data))) / data_points) %>% 
-        ungroup() %>% 
-      as.data.table() %>% setorder(fundamentals_date) %>% as_tibble() %>% 
-      mutate(p_na_trailing_n_yrs = 
-               slider::slide_dbl(na_perc, sum, .before = 12*date_range_yrs-1,
-                                 .complete = TRUE)) %>% 
-        slice_min(p_na_trailing_n_yrs) %>% 
-        tail(1) %>% 
-        {tibble(min_date = .$fundamentals_date - lubridate::years(date_range_yrs), 
-                max_date = .$fundamentals_date)}
-    
-    # Get most complete date range
-    data_cl_dates <-
-        data_subset %>% 
-        filter(between(fundamentals_date, 
-                       date_range_w_least_nas$min_date, 
-                       date_range_w_least_nas$max_date))
-    
-    # Get tickers with no NAs in most complete date range
-    tickers_to_use <-
-        data_cl_dates %>% 
-        select(-fundamentals_date) %>% 
-        group_by(ticker) %>% 
-        nest() %>% 
-        transmute(ticker,
-                  na_count = sum(is.na(unlist(data)))) %>% 
-        filter(na_count == 0) %>% 
-        pull(ticker)
-    
-    if(length(tickers_to_use) == 0) 
-        warning("Not enough data available for chosen inputs.")
-    
-    
-    # Clean the sector_yhoo variable by setting sector_yhoo equal to the
-    #  first observed value for each ticker
-    data_cl_sector <-
+  # Search through all possible time spans of length "years" and
+  #  find the date range with the fewest NAs
+  date_range_w_least_nas <-
+    data_subset %>%
+    select(-ticker) %>% 
+    group_by(report_date) %>% 
+    nest() %>% 
+    mutate(report_date, data_points = 
+             map_dbl(data, ~ncol(.x)*nrow(.x))) %>% 
+    mutate(na_perc = sum(is.na(unlist(data))) / data_points) %>% 
+    ungroup() %>% 
+    as.data.table() %>% setorder(report_date) %>% as_tibble() %>% 
+    mutate(p_na_trailing_n_yrs = 
+             slider::slide_dbl(na_perc, sum, .before = 12*years-1,
+                               .complete = TRUE)) %>% 
+    slice_min(p_na_trailing_n_yrs) %>% 
+    tail(1) %>% 
+    {tibble(min_date = .$report_date - lubridate::years(years), 
+            max_date = .$report_date)}
+  
+  # Get most complete date range
+  data_cl_dates <-
+      data_subset %>% 
+      filter(between(report_date, 
+                     date_range_w_least_nas$min_date, 
+                     date_range_w_least_nas$max_date))
+  
+  # Get tickers with no NAs in most complete date range
+  tickers_to_use <-
       data_cl_dates %>% 
-      filter(ticker %in% tickers_to_use) %>% 
-      # Set the sector of the ticker to the first observed sector value
-      # (ticker MGPI had two unique sectors)
+      select(-report_date) %>% 
       group_by(ticker) %>% 
-      mutate(sector_yhoo = first(sector_yhoo)) %>% 
-      ungroup() %>% 
-      as.data.table() %>% 
-      unique() %>% 
-      setorder(ticker, fundamentals_date) %>% 
-      as_tibble()
-    
-    # If there are any NAs remaining, raise a warning.
-    if(data_cl_sector %>% is.na() %>% any()) 
-        warning("There are some NAs in the data.")
-    
-    date_diffs <-
-        data_cl_sector %>% 
-      as.data.table() %>% 
-      setorder(fundamentals_date) %>% 
-      as_tibble() %>% 
-      group_by(ticker) %>%
-      select(ticker, fundamentals_date) %>% 
-      mutate(date_diff = as.numeric(fundamentals_date - lag(fundamentals_date))) %>% 
-      # Replace each initial NA with a safe number, 30, 
-      #  so that the row isn't dropped later
-        mutate(date_diff = replace(date_diff, row_number() == 1, 30))
-    
-    # date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
+      nest() %>% 
+      transmute(ticker,
+                na_count = sum(is.na(unlist(data)))) %>% 
+      filter(na_count == 0) %>% 
+      pull(ticker)
+  
+  if(length(tickers_to_use) == 0) 
+      warning("Not enough data available for chosen inputs.")
+  
+  
+  # Clean the sector_yhoo variable by setting sector_yhoo equal to the
+  #  first observed value for each ticker
+  data_cl_sector <-
+    # Use "data_subset" if you want to include data that might exist outside the 
+    # date range
+    # data_subset %>% 
+    data_cl_dates %>% 
+    filter(ticker %in% tickers_to_use) %>% 
+    # Set the sector of the ticker to the first observed sector value
+    # (ticker MGPI had two unique sectors)
+    group_by(ticker) %>% 
+    mutate(sector_yhoo = first(sector_yhoo)) %>% 
+    ungroup() %>% 
+    as.data.table() %>% 
+    unique() %>% 
+    setorder(ticker, report_date) %>% 
+    as_tibble()
+  
+  # If there are any NAs remaining, raise a warning.
+  if(data_cl_sector %>% is.na() %>% any()) 
+      warning("There are some NAs in the data.")
+  
+  date_diffs <-
+    data_cl_sector %>% 
+    as.data.table() %>% 
+    setorder(report_date) %>% 
+    as_tibble() %>% 
+    group_by(ticker) %>%
+    select(ticker, report_date) %>% 
+    mutate(date_diff = as.numeric(report_date - lag(report_date))) %>% 
+    # Replace each initial NA with a safe number, 30, 
+    #  so that the row isn't dropped later
+    mutate(date_diff = replace(date_diff, row_number() == 1, 30))
+  
+  # date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
 
-    
-    # If any of the date differences are not between 27 and 32, then stop
-    if(!date_diffs %>% pull(date_diff) %>% between(., 27, 32) %>% all())
-        warning("Some date sequences are incomplete.")
-    
-    return(data_cl_sector)
+  # data_cl_sector %>% filter(ticker == "COST") %>% View()
+  # date_diffs %>% arrange(date_diff)
+  
+  
+  # If any of the date differences are not between 27 and 32, then stop
+  if(!date_diffs %>% pull(date_diff) %>% between(., 27, 32) %>% all())
+      warning("Some date sequences are incomplete.")
+  
+  return(data_cl_sector)
 }
 
 

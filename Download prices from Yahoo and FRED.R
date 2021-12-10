@@ -17,6 +17,11 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data/"
 tickers <- read_excel(paste0(dir_data, "Tickers.xlsx"), sheet = 1) %>% 
     pull(Ticker)
 
+tickers <- 
+    tickers %>% 
+    c("PLTR", "SOFI", "TSLA", "ZM", "BTCM", "USCI", "VNQ") %>% unique()
+
+
 # tickers %>% distinct(Description) %>% pull()
 
 # tickers <- sample(tickers, 5)
@@ -151,22 +156,22 @@ end <- start + step - 1
 end[length(end)] <- min(length(tickers), end[length(end)])
 
 
-!!!!! 6000-...
-start <- start[start >= 6000]
-end <- end[end > 6000]
+!!!!! 10001-...
+start <- start[start >= 10000]
+end <- end[end > 10000]
 
 # Download monthly prices
 for(i in seq_along(start)) {
     download_Yhoo_prices(rng = start[i]:end[i], period = "monthly",
-                         start_date = "1999-12-31")
+                         start_date = "2009-12-31")
     print(paste0(start[i], "-", end[i], " done!"))
 } 
 
 
-!!!!! 3001-5000
-!!!!! 10000-...
-start <- start[start <= 3000]
-end <- end[end <= 5000]
+# !!!!! 3001-5000
+# !!!!! 10000-...
+# start <- start[start <= 3000]
+# end <- end[end <= 5000]
 # start <- start[start >= 10000]
 # end <- end[end > 10000]
 
