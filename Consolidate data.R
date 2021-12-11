@@ -1899,19 +1899,21 @@ prices_from_Tickers <-
 prices_SP500TR <- prices_from_Tickers %>% filter(ticker == "^SP500TR")
 
 prices_SP500TR_monthly <-
-    prices_SP500TR %>%
-    rename(SP500TR_adjusted = adjusted) %>% 
-    slice(endpoints(date, on = "months")) %>% 
-    # Round dates to end of month (sometimes the last trading
-    #  day of a month is before the last day of the month)
-    mutate(rounded_date = round_date(date, unit = "month") - days(1),
-           SP500TR_adj_return_monthly = SP500TR_adjusted / lag(SP500TR_adjusted, 1) - 1,
-           SP500TR_adj_return_qtrly = SP500TR_adjusted / lag(SP500TR_adjusted, 3) - 1) %>% 
-    # Rounding the dates sometimes creates duplicate dates if the 
-    # most recent date is rounded down to the prior month-end, so
-    # remove such duplicates in that case
-    filter(!duplicated(rounded_date)) %>% 
-    select(ticker, rounded_date, everything())
+  prices_SP500TR %>%
+  rename(SP500TR_adjusted = adjusted) %>% 
+  slice(endpoints(date, on = "months")) %>% 
+  # Round dates to end of month (sometimes the last trading
+  #  day of a month is before the last day of the month)
+  mutate(rounded_date = round_date(date, unit = "month") - days(1),
+         SP500TR_adj_return_monthly = SP500TR_adjusted / lag(SP500TR_adjusted, 1) - 1,
+         SP500TR_adj_return_qtrly = SP500TR_adjusted / lag(SP500TR_adjusted, 3) - 1) %>% 
+  # Rounding the dates sometimes creates duplicate dates if the 
+  # most recent date is rounded down to the prior month-end, so
+  # remove such duplicates in that case
+  filter(!duplicated(rounded_date)) %>% 
+  select(ticker, rounded_date, everything()) %>% 
+  rename(report_date = rounded_date) %>% 
+  select(-date)
 
 
 # Save
@@ -1950,10 +1952,10 @@ prices_daily_raw_monthly <-
   prices_daily_raw %>%
   group_by(ticker) %>% 
   slice(endpoints(date, on = "months")) %>% 
-  select(!contains("return"))
+  select(!contains("return")) %>% 
+  rename(report_date = date)
 
   
-
 # Monthly prices
 files_prices_monthly <- 
   get_recent_price_dirs(period = "monthly", dir = "data/cleaned data")
@@ -1961,13 +1963,13 @@ files_prices_monthly <-
 prices_monthly_raw <- 
   files_prices_monthly %>% 
   map_df(~read_tibble(.x)) %>%
-  select(ticker, date = ref.date, close = price.close, 
+  select(ticker, report_date = ref.date, close = price.close, 
          adjusted = price.adjusted,
          adj_return_monthly = ret.adjusted.prices) %>% 
   as.data.table() %>% 
-  setorder(ticker, date) %>%
+  setorder(ticker, report_date) %>%
   # Remove rows that contain a duplicate ticker-date key
-  unique(by = c("ticker", "date")) %>% 
+  unique(by = c("ticker", "report_date")) %>% 
   as_tibble() %>% 
   mutate(adjusted = ifelse(adjusted < 0, NA, adjusted)) %>% 
   full_join(prices_daily_raw_monthly)
@@ -2005,8 +2007,9 @@ max_drawdown <- function(rets) {
 
 prices_daily_ratios <-
   prices_daily_raw %>% 
+  rename(report_date = date) %>% 
   as.data.table() %>% 
-  setorder(ticker, date) %>% 
+  setorder(ticker, report_date) %>% 
   unique() %>% 
   as_tibble() %>% 
   drop_na() %>%
@@ -2018,7 +2021,7 @@ prices_daily_ratios <-
          max_drawdown_3Y = max_drawdown(adj_return_daily)) %>%
   # mutate(price_index = adjusted / first(adjusted)) %>% 
   ungroup() %>% 
-  select(ticker, date, everything())
+  select(ticker, report_date, everything())
 
 
 # most_recent_data <-
@@ -2040,16 +2043,16 @@ prices_monthly <-
     mutate(sd_adj_returns_annualized = 
              slide_dbl(adj_return_monthly, sd, .before = 11) * sqrt(12)) %>% 
     # Round report_period dates to nearest month-end
-    mutate(rounded_date = round_date(date, unit = "month") - days(1)) %>% 
+    mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>% 
     mutate(price_index = adjusted / first(adjusted)) %>% 
-    select(-date, -adj_return_monthly) %>% 
-    select(ticker, rounded_date, everything()) %>%
+    select(-report_date, -adj_return_monthly) %>% 
+    select(ticker, report_date = rounded_date, everything()) %>%
     # Rounding the dates sometimes creates duplicate dates if the 
     # most recent date is rounded down to the prior month-end, so
     # remove such duplicates in that case
-    filter(!duplicated(rounded_date)) %>% 
+    filter(!duplicated(report_date)) %>% 
     ungroup() %>% 
-    filter(rounded_date <= Sys.Date())
+    filter(report_date <= Sys.Date())
 
 # Save
 fwrite(prices_monthly, paste0(dir_data, "data/cleaned data/prices_monthly (", 
@@ -2104,7 +2107,7 @@ fundamentals_full_dates <-
 combined_fundamentals_merged <-
   fundamentals_full_dates %>%
   left_join(prices_monthly %>% rename(report_date = rounded_date)) %>%
-  left_join(prices_SP500TR_monthly %>% rename(report_date = rounded_date))
+  left_join(prices_SP500TR_monthly)
 
 # Save
 fwrite(combined_fundamentals_merged, 
@@ -2132,20 +2135,24 @@ combined_fundamentals_merged %>%
  
 
 
-# fundamentals_filled <-
-#     combined_fundamentals_merged %>%
-#     group_by(ticker) %>% 
-#     mutate(across(!starts_with("decision_price") &
-#                     !starts_with("decision_sd") & 
-#                     !starts_with("decision_date") &
-#                     !starts_with("decision_SP500TR_adj_return") &
-#                     !starts_with("adjusted"),
-#                   ~fill_na_two_periods_max(.x)))
-# 
-# # fundamentals_filled %>% filter(ticker == "PLTR")
-# 
-# # Save
-# fwrite(fundamentals_filled, paste0(dir_data, "data/cleaned data/fundamentals_filled (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fundamentals_filled <-
+  combined_fundamentals_merged %>%
+  group_by(ticker) %>%
+  mutate(across(shares_basic,
+                  #!starts_with("decision_price") &
+                  #!starts_with("decision_sd") &
+                  #!starts_with("decision_date") &
+                  #!starts_with("decision_SP500TR_adj_return") &
+                  #!starts_with("adjusted"),
+                  ~fill_na_two_periods_max(.x))) %>% 
+  ungroup()
+
+# fundamentals_filled %>% filter(ticker == "PLTR")
+
+# Save
+fwrite(fundamentals_filled, 
+       paste0(dir_data, "data/cleaned data/fundamentals_filled (", Sys.Date() %>%
+                str_replace_all("-", " "), ").csv"))
 
 
 #----------#
@@ -2156,11 +2163,11 @@ combined_fundamentals_merged %>%
 source("helper functions.R")
 
 # Read
-# file_fundamentals_filled <- 
-#   list.files("data/cleaned data", 
-#              pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv", 
-#              full.names = TRUE) %>% max()
-# fundamentals_filled <- read_tibble(file_fundamentals_filled)
+file_fundamentals_filled <-
+  list.files("data/cleaned data",
+             pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv",
+             full.names = TRUE) %>% max()
+fundamentals_filled <- read_tibble(file_fundamentals_filled)
 
 # fundamentals_filled %>% filter(ticker == "SOFI") %>% 
 #   janitor::remove_empty(which = "cols") %>% 
@@ -2169,8 +2176,8 @@ source("helper functions.R")
 
 
 date_spans <-
-  # fundamentals_filled %>%
-  combined_fundamentals_merged %>% 
+  fundamentals_filled %>%
+  # combined_fundamentals_merged %>% 
   group_by(ticker) %>% 
   summarize(across(report_date, list(start = min, end = max), 
                    .names = "{.fn}")) %>% 
@@ -2189,6 +2196,28 @@ date_spans %>%
 tickers_to_use <- 
   date_spans %>% 
   filter(years >= 10) %>% pull(ticker)
+
+
+most_recent <- function(x, var1, var2, ratio_name) {
+  ############  
+  # x <- fundamentals_filled %>% filter(ticker == "AAPL") %>%
+  #   select(ticker, report_date, adjusted, net_income_1Q)
+  # var1 <- adjusted
+  # var2 <- net_income_1Q
+  ############  
+
+  x %>% 
+    mutate(
+      {{ ratio_name }} := slide2_dbl({{ var1 }}, {{ var2 }}, 
+                         ~.x[6] / first(na.omit(.y[c(3, 2, 1)])), 
+                         .before = 5, .complete = TRUE)
+    )
+}
+
+most_recent(x = x, var1 = adjusted, var2 = net_income_1Q,
+            ratio_name = "ratio")
+
+
 
 
 # Ratios 
@@ -2330,8 +2359,7 @@ get_ratios <- function(x) {
     roa_mean_8Y = 
       slide_dbl(roa, ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
                 .before = 8*12-12, .complete = TRUE),
-    market_cap = price_close *
-      shares_basic,
+    market_cap = price_close * shares_basic,
     pe = market_cap / net_income_1Y,
     adj_return_quarterly = price_adj / 
       lag(price_adj, 3) - 1,
@@ -2436,8 +2464,7 @@ get_ratios <- function(x) {
 # get_ratios(x = fundamentals_filled %>% filter(ticker == "AAPL"))
 # ==# Slow! ~ 6 min
 start9 <- Sys.time()
-# ratios <- get_ratios(fundamentals_filled)
-ratios <- get_ratios(combined_fundamentals_merged)
+ratios <- get_ratios(fundamentals_filled)
 end9 <- Sys.time(); end9 - start9
 
 the_end <- Sys.time(); the_end - the_start # ~ 15 mins
