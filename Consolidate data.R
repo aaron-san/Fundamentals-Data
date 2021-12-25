@@ -47,10 +47,11 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/"
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # EDGAR data cleanup
-!!!! put source(....R in header) with instructions for cleaning zip
-
+if(pingr::is_online())
+  source("../EDGAR data/EDGAR data - consolidation.R")
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
@@ -273,11 +274,12 @@ factset_cash_flow_statements_yearly <-
 #   from the "EDGAR data" project
 #-----------------------------------------------#
 
-dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/EDGAR data/Edgar data/Modified"
-edgar_files <- list.files(dir_r, pattern = "edgar_.*_qtr.csv", full.names = TRUE)
+dir_r <- "C:/Users/user/Desktop/Aaron/R/Projects/EDGAR data/data/cleaned"
+edgar_files <- 
+  list.files(dir_r, pattern = "edgar_.*.csv", full.names = TRUE)
 edgar_is_file <- edgar_files %>% str_subset("income_statements")
 edgar_bs_file <- edgar_files %>% str_subset("balance_sheets")
-edgar_cf_file <- edgar_files %>% str_subset("cash_flow_statements")
+edgar_cf_file <- edgar_files %>% str_subset("cash_flows")
 
 edgar_income_statements_quarterly <- 
     read_tibble(edgar_is_file) %>% 
@@ -329,7 +331,7 @@ edgar_profile_data <-
 # Save to this project's data directory
 fwrite(edgar_profile_data, paste0(dir_data, "data/cleaned data/edgar_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
-fwrite(edgar_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/edgar_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(edgar_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/edgar_profiles (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 #--------------------------#
@@ -906,7 +908,7 @@ stopifnot(!bs_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>%
 # Save to this project's data directory
 fwrite(bs_consolidated, paste0(dir_data, "data/cleaned data/bs_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
-fwrite(bs_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/bs_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(bs_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/bs_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
@@ -917,16 +919,16 @@ fwrite(bs_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-a
 # Income Statements 
 #~~~~~~~~~~~~~~~~~~~#
 
-
+!!! ticker AHGP has filled values for revenue_1Y!!!!
 # Consolidate revenue
 revenue <-
   reduce(list(yhoo_income_statements_yearly %>% 
                            select(ticker, report_date, 
                                   yhoo_revenue_1Y = total_revenue),
-                         yhoo_income_statements_quarterly %>% 
+                         yhoo_income_statements_quarterly %>%
                            select(ticker, report_date, 
                                   yhoo_revenue_1Q = total_revenue),
-                         factset_income_statements_yearly %>% 
+                         factset_income_statements_yearly %>%  
                            select(ticker, report_date, 
                                   factset_revenue_1Y = revenue),
                          edgar_income_statements_quarterly %>% 
@@ -938,11 +940,9 @@ revenue <-
                          simfin_income_statements_quarterly %>% 
                            select(ticker, report_date, 
                                   simfin_revenue_1Q = revenue),
-                         input_data_fundamentals %>% 
+                         input_data_fundamentals %>%
                            select(ticker, report_date, 
-                                  input_data_revenue_1Y = revenue_1Y),
-                         input_data_fundamentals %>% 
-                           select(ticker, report_date, 
+                                  input_data_revenue_1Y = revenue_1Y,
                                   input_data_revenue_1Q = revenue_1Q),
                          graphfund_income_statements_quarterly %>% 
                            select(ticker, report_date, 
@@ -959,7 +959,7 @@ revenue <-
                                   input_data_revenue_1Q,
                                   graphfund_revenue_1Q)) %>% 
   remove_duplicates()
-  
+
 
 # Consolidate gross_profit
 gross_profit <-
@@ -1180,7 +1180,7 @@ stopifnot(!is_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>%
 # Save to this project's data directory
 fwrite(is_consolidated, paste0(dir_data, "data/cleaned data/is_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
-fwrite(is_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/is_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(is_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/is_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
@@ -1467,7 +1467,7 @@ stopifnot(!cf_consolidated %>% select(ticker, rounded_date) %>% duplicated() %>%
 # Save to this project's data directory
 fwrite(cf_consolidated, paste0(dir_data, "data/cleaned data/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
-fwrite(cf_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(cf_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/cf_consolidated (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 
@@ -1598,7 +1598,7 @@ simfin_profile_data <-
 # Save to this project's data directory
 fwrite(simfin_profile_data, paste0(dir_data, "data/cleaned data/simfin_profile_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 # Save to stock-analysis data directory
-fwrite(simfin_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/simfin_profile_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+fwrite(simfin_profile_data, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/simfin_profile_data (", Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
 # Join profile data sources
@@ -1653,21 +1653,19 @@ profile_data_consolidated <-
     contains("industry") | contains("sector"),
     snakecase::to_snake_case)
   ) %>%
-  mutate(industry_yhoo = replace_na(industry_yhoo, "unknown")) %>%
-  mutate(industry_edgar = str_replace(industry_edgar, "uncategorized", "unknown")) %>%
-  mutate(industry_edgar = replace_na(industry_edgar, "unknown")) %>%
-  mutate(industry_simfin = replace_na(industry_simfin, "unknown")) %>%
-  mutate(industry_simfin = str_replace(industry_simfin, "other", "unknown"))
+  mutate(industry_edgar = 
+           str_replace(industry_edgar, "uncategorized", "unknown")) %>%
+  mutate(industry_simfin = 
+           str_replace(industry_simfin, "other", "unknown")) %>% 
+  mutate(across(starts_with("industry_") | starts_with("sector_"),
+    ~replace_na(.x, "unknown"))
+    )
+
 
 
 if(profile_data_consolidated %>% count(ticker) %>% filter(n > 1) %>% nrow() > 0)
   stop("Some duplicate tickers!")
   
-# Remove unused objects
-# rm(edgar_profile_data)
-# rm(yhoo_profile_data)
-# rm(simfin_profile_data)
-
 # save to this project's data directory
 fwrite(profile_data_consolidated, 
        paste0(dir_data, "data/cleaned data/profile_data_consolidated (", 
@@ -1738,10 +1736,12 @@ shares_basic <-
               # - yhoo_profile_data
               # - simfin_profile_data
               # - input_data_profiles
-              profile_data_consolidated %>% 
+              profile_data_consolidated %>%
                 filter(!is.na(report_date)) %>% 
                 select(ticker, report_date, 
-                       input_data_shares_basic_seeking_alpha),
+                       profile_data_input_data_shares_basic_seeking_alpha =
+                         input_data_shares_basic_seeking_alpha,
+                       profile_data_shares_basic = shares_basic),
               simfin_balance_sheets_quarterly %>% 
                 select(ticker, report_date, 
                        simfin_shares_basic_bs_1Q = shares_basic),
@@ -1775,7 +1775,8 @@ shares_basic <-
               simfin_shares_basic_is_1Y,
               simfin_shares_basic,
               input_data_yhoo_shares_basic,
-              input_data_shares_basic_seeking_alpha)) %>% 
+              profile_data_shares_basic,
+              profile_data_input_data_shares_basic_seeking_alpha)) %>% 
   as.data.table() %>% 
   drop_na() %>% 
   unique() %>% 
@@ -1789,7 +1790,6 @@ shares_basic <-
   select(-n_vals) %>% 
   setorder(ticker, rounded_date) %>% 
   as_tibble()
-
 
 
 # Consolidate net_income fields from is and cf
@@ -1815,7 +1815,11 @@ fundamentals_consolidated <-
     cf_consolidated %>% select(-net_income_1Q, -net_income_1Y),
     bs_consolidated,
     shares_basic,
-    net_income),
+    net_income,
+    profile_data_consolidated %>% 
+      select(!contains("shares_basic")) %>% 
+      select(ticker, rounded_date = report_date, where(is.numeric)) %>% 
+      drop_na(rounded_date)),
     full_join) %>% 
   rename(report_date = rounded_date) %>% 
   filter(!is.na(ticker)) %>% 
@@ -1823,7 +1827,8 @@ fundamentals_consolidated <-
   unique() %>% 
   setorder(ticker, report_date) %>%
   # Remove rows that have all NAs
-  filter(rowSums(is.na(select(., -c(ticker, report_date)))) != ncol(select(., -c(ticker, report_date)))) %>%
+  filter(rowSums(is.na(select(., -c(ticker, report_date)))) != 
+           ncol(select(., -c(ticker, report_date)))) %>%
   setorder(ticker, -report_date) %>% 
   add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
   select(ticker, report_date, everything()) %>% 
@@ -1849,230 +1854,20 @@ fwrite(fundamentals_consolidated,
        paste0(dir_data, "data/cleaned data/fundamentals_consolidated.csv"))
 
 
-
-# Identify tickers that could not be downloaded cleanly
-#  the last time with BatchGetSymbols
-
-
-files_control <- get_recent_price_dirs(pattern = "df_control", 
-                                       period = "monthly")
-
-tickers_with_dirty_prices <- 
-  files_control %>%
-  map_df(~read_csv(.x, col_types = cols()) %>% 
-           filter(threshold.decision == "OUT")) %>% 
-  pull(ticker)
-
-tickers_with_clean_prices <-
-  fundamentals_consolidated %>% 
-  distinct(ticker) %>% 
-  # Filter out tickers that could not be downloaded cleanly using BatchGetSymbols
-  filter(!ticker %in% tickers_with_dirty_prices) %>% 
-  pull(ticker) %>% 
-  # Manually add tickers that might not be present
-  c("SOFI", "PLTR") %>% 
-  unique()
-length(tickers_with_clean_prices)
-
-
-# Save list of tickers to use when downloading prices
-write_lines(tickers_with_clean_prices, 
-            "data/cleaned data/tickers_with_clean_prices.txt")
-
-
-# 452 companies have over 10 years of data
-# 1,375 --> 4,935 companies have over 7 years of data
-# 1,651 companies have over 5 years of data
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~#
-# Prices data             #
-#~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-prices_from_Tickers_file <- list.files("data", pattern = "Prices from Tickers", 
-                                  full.names = TRUE) %>% max()
-prices_from_Tickers <- 
-  read_tibble(prices_from_Tickers_file, date_format = "%m/%d/%Y") %>% 
-  select(ticker, date, close = price.close, adjusted = price.adjusted,
-         adj_return_daily = ret.adjusted.prices)
-
-prices_SP500TR <- prices_from_Tickers %>% filter(ticker == "^SP500TR")
-
-prices_SP500TR_monthly <-
-  prices_SP500TR %>%
-  rename(SP500TR_adjusted = adjusted) %>% 
-  slice(endpoints(date, on = "months")) %>% 
-  # Round dates to end of month (sometimes the last trading
-  #  day of a month is before the last day of the month)
-  mutate(rounded_date = round_date(date, unit = "month") - days(1),
-         SP500TR_adj_return_monthly = SP500TR_adjusted / lag(SP500TR_adjusted, 1) - 1,
-         SP500TR_adj_return_qtrly = SP500TR_adjusted / lag(SP500TR_adjusted, 3) - 1) %>% 
-  # Rounding the dates sometimes creates duplicate dates if the 
-  # most recent date is rounded down to the prior month-end, so
-  # remove such duplicates in that case
-  filter(!duplicated(rounded_date)) %>% 
-  select(ticker, rounded_date, everything()) %>% 
-  rename(report_date = rounded_date) %>% 
-  select(-date)
-
-
-# Save
-fwrite(prices_SP500TR_monthly, 
-       paste0(dir_data, "data/cleaned data/", "prices_SP500TR.csv"))
-
-
-
-#--------------#
-# Stock prices
-#--------------#
-
-# Daily prices
-files_prices_daily <- 
-  get_recent_price_dirs(period = "daily", dir = "data/cleaned data")
+# Remove dates and numeric cols that were already merged with fundamentals above
+profile_data_final <-
+  profile_data_consolidated %>% 
+  select(where(is.character))
   
-
-prices_daily_raw <-
-  files_prices_daily %>%
-  map_df(~read_tibble(.x)) %>%
-  select(ticker, date = ref.date, close = price.close, 
-         adjusted = price.adjusted,
-         adj_return_daily = ret.adjusted.prices) %>% 
-  as.data.table() %>% 
-  setorder(ticker, date) %>% 
-  # Remove rows that contain a duplicate ticker-date key
-  # filter(!duplicated(ticker, date)) %>%
-  unique(by = c("ticker", "date")) %>% 
-  as_tibble() %>% 
-  mutate(adjusted = ifelse(adjusted < 0, NA, adjusted)) %>% 
-  full_join(prices_from_Tickers)
-  
-# prices_daily_raw %>% filter(ticker == "SOFI")
-
-prices_daily_raw_monthly <- 
-  prices_daily_raw %>%
-  group_by(ticker) %>% 
-  slice(endpoints(date, on = "months")) %>% 
-  select(!contains("return")) %>% 
-  rename(report_date = date)
-
-  
-# Monthly prices
-files_prices_monthly <- 
-  get_recent_price_dirs(period = "monthly", dir = "data/cleaned data")
-
-prices_monthly_raw <- 
-  files_prices_monthly %>% 
-  map_df(~read_tibble(.x)) %>%
-  select(ticker, report_date = ref.date, close = price.close, 
-         adjusted = price.adjusted,
-         adj_return_monthly = ret.adjusted.prices) %>% 
-  as.data.table() %>% 
-  setorder(ticker, report_date) %>%
-  # Remove rows that contain a duplicate ticker-date key
-  unique(by = c("ticker", "report_date")) %>% 
-  as_tibble() %>% 
-  mutate(adjusted = ifelse(adjusted < 0, NA, adjusted)) %>% 
-  full_join(prices_daily_raw_monthly)
-
-# prices_monthly_raw %>% filter(ticker == "SOFI")
-
-
-
-
-# Weekly prices can be use for sd, drawdown or other metrics.
-RSI_n <- function(x, n) {
-  if(length(x) > n + 1) {
-    rsi <- TTR::RSI(x, n = n)
-  } else {
-    rsi <- NA
-  }
-}
-
-price_index_n <- function(x, n) {
-  if(length(x) > n + 1) {
-    price_index <- signif(x / runMax(x, n = n), digits = 2)
-  } else {
-    price_index <- NA
-  }
-}
-
-
-max_drawdown <- function(rets) {
-  rets_index <- cumprod(1 + rets)
-  drawdown <- 1 - rets_index/cummax(rets_index)
-  max_dd <- max(1 - rets_index/cummax(rets_index))
-}
-
-
-
-prices_daily_ratios <-
-  prices_daily_raw %>% 
-  rename(report_date = date) %>% 
-  as.data.table() %>% 
-  setorder(ticker, report_date) %>% 
-  unique() %>% 
-  as_tibble() %>% 
-  drop_na() %>%
-  # filter(date >= Sys.Date() - years(10), date <= Sys.Date()) %>% 
-  group_by(ticker) %>%
-  # filter(ticker == "INST") %>%
-  mutate(RSI_14D = RSI_n(adjusted, n = 14),
-         price_index_3Y = adjusted / first(adjusted),
-         max_drawdown_3Y = max_drawdown(adj_return_daily)) %>%
-  # mutate(price_index = adjusted / first(adjusted)) %>% 
-  ungroup() %>% 
-  select(ticker, report_date, everything())
-
-
-# most_recent_data <-
-#   prices_daily_ratios %>% 
-#   group_by(ticker) %>% 
-#   filter(date == max(date))
-# colnames(most_recent_data) <- c("ticker", paste0("most_recent_", colnames(most_recent_data[, -1])))
-
-# Save 
-fwrite(prices_daily_ratios, 
-       paste0(dir_data, "data/cleaned data/prices_daily_ratios (", 
+fwrite(profile_data_final, 
+       paste0(dir_data, "data/cleaned data/profile_data_final (", 
               Sys.Date() %>% str_replace_all("-", " "), ").csv"))
 
 
-prices_monthly <- 
-    prices_monthly_raw %>%
-    group_by(ticker) %>% 
-    # mutate(return_monthly_adj = adjusted / lag(adjusted) - 1) %>% 
-    mutate(sd_adj_returns_annualized = 
-             slide_dbl(adj_return_monthly, sd, .before = 11) * sqrt(12)) %>% 
-    # Round report_period dates to nearest month-end
-    mutate(rounded_date = round_date(report_date, unit = "month") - days(1)) %>% 
-    mutate(price_index = adjusted / first(adjusted)) %>% 
-    select(-report_date, -adj_return_monthly) %>% 
-    select(ticker, report_date = rounded_date, everything()) %>%
-    # Rounding the dates sometimes creates duplicate dates if the 
-    # most recent date is rounded down to the prior month-end, so
-    # remove such duplicates in that case
-    filter(!duplicated(report_date)) %>% 
-    ungroup() %>% 
-    filter(report_date <= Sys.Date())
-
-# Save
-fwrite(prices_monthly, paste0(dir_data, "data/cleaned data/prices_monthly (", 
-                              Sys.Date() %>% str_replace_all("-", " "),
-                              ").csv"))
-
-# prices_monthly %>% filter(ticker == "PLTR")
-
-
-tickers_from_prices <- prices_monthly %>% distinct(ticker) %>% pull()
-
-
-# S&P 500 Prices
-prices_SP500TR_monthly_file <- list.files("data/cleaned data", 
-                                          pattern = "prices_SP500TR.csv", 
-                                          full.names = TRUE)
-prices_SP500TR_monthly <- read_tibble(prices_SP500TR_monthly_file)
-
-
-
+# Get cleaned weekly and monthly prices
+start_cp <- Sys.time()
+source("Clean prices.R")
+end_cp <- Sys.time(); end_cp - start_cp
 
 #-----------------------------------------#
 # Part 10 - Merge Prices and Fundamentals
@@ -2080,16 +1875,12 @@ prices_SP500TR_monthly <- read_tibble(prices_SP500TR_monthly_file)
 fundamentals_consolidated <- 
   read_tibble("data/cleaned data/fundamentals_consolidated.csv")
 
-# fundamentals_consolidated %>% filter(ticker == "PLTR")
-
 # Filter out tickers that have no price data
 fundamentals_with_prices <-
   fundamentals_consolidated %>% 
   filter(ticker %in% tickers_from_prices)
 
-
 # Fill date range
-# full_date_set <- sort(Sys.Date() %>% floor_date(unit = "month") - months(0:(12*30)) - days(1))
 fundamentals_full_dates <- 
   fundamentals_with_prices %>% 
   group_by(ticker) %>%
@@ -2100,59 +1891,29 @@ fundamentals_full_dates <-
   setorder(ticker, report_date) %>% 
   as_tibble()
 
-# fundamentals_full_dates %>% filter(ticker == "PLTR") %>% view()
-
-
 
 combined_fundamentals_merged <-
   fundamentals_full_dates %>%
-  left_join(prices_monthly %>% rename(report_date = rounded_date)) %>%
+  left_join(prices_monthly) %>%
   left_join(prices_SP500TR_monthly)
 
 # Save
 fwrite(combined_fundamentals_merged, 
        paste0(dir_data, "data/cleaned data/combined_fundamentals_merged.csv"))
 
-# combined_fundamentals_merged %>% filter(ticker == "SOFI") %>% View()
-
 
 # Load libraries and helper functions
 source("helper functions.R")
 
-# combined_fundamentals_merged <- read_tibble(paste0(dir_data, "cleaned data/combined_fundamentals_merged.csv"))
-
 # Find percent of missing values
-combined_fundamentals_merged %>%
-  select(ticker, report_date, where(is.numeric)) %>%
-  pivot_longer(-c(ticker, report_date)) %>%
-  mutate(exists = !is.na(value)) %>%
-  group_by(ticker) %>%
-  summarize(pct_na = sum(is.na(value))/n()) %>%
-  arrange(pct_na) %>% 
-  slice_max(order_by = pct_na, n = 10)
-
-# combined_fundamentals_merged %>% filter(ticker == "PLTR")
- 
-
-
-fundamentals_filled <-
-  combined_fundamentals_merged %>%
-  group_by(ticker) %>%
-  mutate(across(shares_basic,
-                  #!starts_with("decision_price") &
-                  #!starts_with("decision_sd") &
-                  #!starts_with("decision_date") &
-                  #!starts_with("decision_SP500TR_adj_return") &
-                  #!starts_with("adjusted"),
-                  ~fill_na_two_periods_max(.x))) %>% 
-  ungroup()
-
-# fundamentals_filled %>% filter(ticker == "PLTR")
-
-# Save
-fwrite(fundamentals_filled, 
-       paste0(dir_data, "data/cleaned data/fundamentals_filled (", Sys.Date() %>%
-                str_replace_all("-", " "), ").csv"))
+# combined_fundamentals_merged %>%
+#   select(ticker, report_date, where(is.numeric)) %>%
+#   pivot_longer(-c(ticker, report_date)) %>%
+#   mutate(exists = !is.na(value)) %>%
+#   group_by(ticker) %>%
+#   summarize(pct_na = sum(is.na(value))/n()) %>%
+#   arrange(pct_na) %>% 
+#   slice_max(order_by = pct_na, n = 10)
 
 
 #----------#
@@ -2163,322 +1924,70 @@ fwrite(fundamentals_filled,
 source("helper functions.R")
 
 # Read
-file_fundamentals_filled <-
-  list.files("data/cleaned data",
-             pattern = "fundamentals_filled \\(\\d{4} \\d{2} \\d{2}\\).csv",
-             full.names = TRUE) %>% max()
-fundamentals_filled <- read_tibble(file_fundamentals_filled)
+combined_fundamentals_merged <- 
+  read_tibble(paste0(dir_data, 
+                     "data/cleaned data/combined_fundamentals_merged.csv"))
 
-# fundamentals_filled %>% filter(ticker == "SOFI") %>% 
-#   janitor::remove_empty(which = "cols") %>% 
-#   View()
+# date_spans <-
+#   combined_fundamentals_merged %>% 
+#   group_by(ticker) %>% 
+#   summarize(across(report_date, list(start = min, end = max), 
+#                    .names = "{.fn}")) %>% 
+#   mutate(years = floor(as.numeric(end - start)/365))
 
+# date_spans %>%
+#   filter(years <= 25) %>% 
+#   ggplot() +
+#   geom_histogram(aes(x=years), fill = "maroon", color = "white", 
+#                  alpha = 0.7, binwidth = 1) +
+#   theme_minimal() +
+#   labs(title = "Range of years for the tickers", y = NULL)
 
-
-date_spans <-
-  fundamentals_filled %>%
-  # combined_fundamentals_merged %>% 
-  group_by(ticker) %>% 
-  summarize(across(report_date, list(start = min, end = max), 
-                   .names = "{.fn}")) %>% 
-  mutate(years = floor(as.numeric(end - start)/365))
-
-
-
-date_spans %>%
-  filter(years <= 25) %>% 
-  ggplot() +
-  geom_histogram(aes(x=years), fill = "maroon", color = "white", 
-                 alpha = 0.7, binwidth = 1) +
-  theme_minimal() +
-  labs(title = "Range of years for the tickers", y = NULL)
-
-tickers_to_use <- 
-  date_spans %>% 
-  filter(years >= 10) %>% pull(ticker)
-
-
-most_recent <- function(x, var1, var2, ratio_name) {
-  ############  
-  # x <- fundamentals_filled %>% filter(ticker == "AAPL") %>%
-  #   select(ticker, report_date, adjusted, net_income_1Q)
-  # var1 <- adjusted
-  # var2 <- net_income_1Q
-  ############  
-
-  x %>% 
-    mutate(
-      {{ ratio_name }} := slide2_dbl({{ var1 }}, {{ var2 }}, 
-                         ~.x[6] / first(na.omit(.y[c(3, 2, 1)])), 
-                         .before = 5, .complete = TRUE)
-    )
-}
-
-most_recent(x = x, var1 = adjusted, var2 = net_income_1Q,
-            ratio_name = "ratio")
-
+# tickers_to_use <- 
+#   date_spans %>% 
+#   filter(years >= 10) %>% pull(ticker)
 
 
 
 # Ratios 
-get_ratios <- function(x) {
-  
-  #### 
-  # x <- fundamentals_filled %>% filter(ticker == "AIV")
-  ####
-  
-  ratios <- 
-    x %>%
-    mutate(
+###############
+# For testing
+# x <- combined_fundamentals_merged %>% filter(str_starts(ticker, "A"))
+###############
+
+# Not Used
+replace_na_values <- function(x) {
+  x %>%   
+  mutate(
       short_long_term_debt = replace_na(short_long_term_debt, 0),
       long_term_debt = replace_na(long_term_debt, 0),
       depreciation_amortization_1Q = replace_na(depreciation_amortization_1Q, 0),
       depreciation_amortization_1Y = replace_na(depreciation_amortization_1Y, 0),
       property_plant_equipment = replace_na(property_plant_equipment, 0),
-      cash_and_short_term_investments = 
-        replace_na(cash_and_short_term_investments, 0),
-      total_stockholder_equity = total_assets - total_liabilities
-      ) %>% 
-    group_by(ticker) %>% #select(ticker, report_date, adjusted) %>% View()
-    
-    mutate(
-      adj_return_3M = slide_dbl(adjusted, ~log(.x[4]/.x[1]), 
-                                .before = 4-1, .complete = TRUE),
-      adj_return_6M = slide_dbl(adjusted, ~log(.x[7]/.x[1]), .before = 7-1, 
-                                .complete = TRUE),
-      adj_return_1Y = slide_dbl(adjusted, ~log(.x[13]/.x[1]), .before = 12-1, 
-                                .complete = TRUE),
-      adj_return_3Y = slide_dbl(adjusted, ~log(.x[37]/.x[1]), .before = 3*12-1,
-                                .complete = TRUE)) %>%
-    mutate(
-    # Estimate 4th quarter's value from yearly data and data from previous 
-    # 3 quarters
-    revenue_1Q_est = slide2_dbl(revenue_1Y, revenue_1Q, ~.x[10] - 
-                                  sum(.y[c(1, 4, 7)]), .before = 9, 
-                                .complete = TRUE), 
-    revenue_1Q = coalesce(revenue_1Q, revenue_1Q_est),
-    operating_income_loss_1Q_est = slide2_dbl(operating_income_loss_1Y,
-                                              operating_income_loss_1Q, ~.x[10] -
-                                                sum(.y[c(1, 4, 7)]), 
-                                              .before = 9, .complete = TRUE), 
-    operating_income_loss_1Q = coalesce(operating_income_loss_1Q,
-                                        operating_income_loss_1Q_est),
-    gross_profit_1Q_est = slide2_dbl(gross_profit_1Y, 
-                                     gross_profit_1Q, ~.x[10] - 
-                                       sum(.y[c(1, 4, 7)]), .before = 9, 
-                                     .complete = TRUE), 
-    gross_profit_1Q = coalesce(gross_profit_1Q, gross_profit_1Q_est),
-    cash_from_operating_activities_1Q_est = 
-      slide2_dbl(cash_from_operating_activities_1Y,
-                 cash_from_operating_activities_1Q, ~.x[10] - 
-                   sum(.y[c(1, 4, 7)]), .before = 9, .complete = TRUE), 
-    cash_from_operating_activities_1Q = 
-      coalesce(cash_from_operating_activities_1Q,
-               cash_from_operating_activities_1Q_est),
-    net_income_common_1Q_est = slide2_dbl(net_income_common_1Y,
-                                          net_income_common_1Q, ~.x[10] - 
-                                            sum(.y[c(1, 4, 7)]), .before = 9,
-                                          .complete = TRUE), 
-    net_income_common_1Q = coalesce(net_income_common_1Q, 
-                                    net_income_common_1Q_est),
-    net_income_1Q_est = slide2_dbl(net_income_1Y, net_income_1Q, ~.x[10] - 
-                                     sum(.y[c(1, 4, 7)]), .before = 9, 
-                                   .complete = TRUE), 
-    net_income_1Q = coalesce(net_income_1Q, net_income_1Q_est),
-    
-    # Estimate yearly (1Y) values by adding previous 4 quarters of data
-    revenue_1Y_est = slide_dbl(revenue_1Q, ~sum(.x[c(1, 4, 7, 10)]), 
-                               .before = 10-1, .complete = TRUE),
-    gross_profit_1Y_est = slide_dbl(gross_profit_1Q, ~sum(.x[c(1, 4, 7, 10)]),
-                                    .before = 10-1, .complete = TRUE),
-    operating_income_loss_1Y_est = 
-      slide_dbl(operating_income_loss_1Q, ~sum(.x[c(1, 4, 7, 10)]), 
-                .before = 10-1, .complete = TRUE),
-    net_income_common_1Y_est = 
-      slide_dbl(net_income_common_1Q, ~sum(.x[c(1, 4, 7, 10)]), 
-                .before = 10-1, .complete = TRUE),
-    net_income_1Y_est = 
-      slide_dbl(net_income_1Q, ~sum(.x[c(1, 4, 7, 10)]), 
-                .before = 10-1, .complete = TRUE),
-    cash_from_operating_activities_1Y_est = 
-      slide_dbl(cash_from_operating_activities_1Q, 
-                ~sum(.x[c(1, 4, 7, 10)]), .before = 10-1, .complete = TRUE),
-    cash_from_investing_activities_1Y_est = 
-      slide_dbl(cash_from_investing_activities_1Q, ~sum(.x[c(1, 4, 7, 10)]),
-                .before = 10-1, .complete = TRUE),
-    cash_from_financing_activities_1Y_est = 
-      slide_dbl(cash_from_financing_activities_1Q, ~sum(.x[c(1, 4, 7, 10)]),
-                .before = 10-1, .complete = TRUE),
-    
-    
-    # Consolidate columns (Choose first non-NA value from two columns)
-    revenue_1Y = coalesce(revenue_1Y, revenue_1Y_est),
-    gross_profit_1Y = coalesce(gross_profit_1Y, gross_profit_1Y_est),
-    operating_income_loss_1Y = coalesce(operating_income_loss_1Y,
-                                        operating_income_loss_1Y_est),
-    net_income_common_1Y = coalesce(net_income_common_1Y, 
-                                    net_income_common_1Y_est),
-    net_income_1Y = coalesce(net_income_1Y, net_income_1Y_est),
-    cash_from_operating_activities_1Y = 
-      coalesce(cash_from_operating_activities_1Y,
-               cash_from_operating_activities_1Y_est),
-    cash_from_investing_activities_1Y = 
-      coalesce(cash_from_investing_activities_1Y,
-               cash_from_investing_activities_1Y_est),
-    cash_from_financing_activities_1Y = 
-      coalesce(cash_from_financing_activities_1Y,
-               cash_from_financing_activities_1Y_est),
-    
-    # Create Ratios
-    gross_margin_1Q = ifelse(gross_profit_1Q == revenue_1Q, NA, 
-                             gross_profit_1Q / revenue_1Q),
-    gross_margin_1Y = ifelse(gross_profit_1Y == revenue_1Y, NA, 
-                             gross_profit_1Y / revenue_1Y),
-    operating_profit_margin_1Y = operating_income_loss_1Y / revenue_1Y,
-    roe = ifelse(total_stockholder_equity > 0, 
-                 net_income_1Y / lag(total_stockholder_equity, 12), NA),
-    roa = net_income_common_1Y / lag(total_assets, 12),
-    capital = property_plant_equipment + total_current_assets -
-      total_current_liabilities - cash_and_short_term_investments,
-    roc = operating_income_loss_1Y / lag(capital, 12),
-    roc_mean_3Y = 
-      slide_dbl(roc, ~prod(1 + .x[c(1, 13, 25)])^(1/(3*12))-1, 
-                .before = 3*12-12, .complete = TRUE),
-    roe_mean_3Y = 
-      slide_dbl(roe, ~prod(1 + .x[c(1, 13, 25)])^(1/(3*12))-1, 
-                .before = 3*12-12, .complete = TRUE),
-    roa_mean_3Y = 
-      slide_dbl(roa, ~prod(1 + .x[c(1, 13, 25)])^(1/(3*12))-1, 
-                .before = 3*12-12, .complete = TRUE),
-    roc_mean_8Y = 
-      slide_dbl(roc, ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
-                .before = 8*12-12, .complete = TRUE),
-    roe_mean_8Y = 
-      slide_dbl(roe, ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
-                .before = 8*12-12, .complete = TRUE),
-    roa_mean_8Y = 
-      slide_dbl(roa, ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
-                .before = 8*12-12, .complete = TRUE),
-    market_cap = price_close * shares_basic,
-    pe = market_cap / net_income_1Y,
-    adj_return_quarterly = price_adj / 
-      lag(price_adj, 3) - 1,
-    current_ratio = total_current_assets / total_current_liabilities,
-    accruals_pct_chg_1Y = (net_income_1Y - cash_from_operating_activities_1Y)/ 
-      lag((net_income_1Y - cash_from_operating_activities_1Y), 12),
-    gross_margin_avg_3Y = 
-      slide_dbl(gross_margin_1Y, ~mean(.x[c(1, 13, 25)]), .before = 3*6-12),
-    gross_margin_sd_3Y = 
-      slide_dbl(gross_margin_1Y, ~sd(.x[c(1, 13, 25)]), .before = 3*6-12), 
-    gross_margin_stability_3Y = gross_margin_avg_3Y / gross_margin_sd_3Y,
-    gross_margin_avg_8Y = 
-      slide_dbl(gross_margin_1Y, ~mean(.x[c(1, 13, 25, 37, 49, 61, 73, 85)]),
-                .before = 8*12-12),
-    gross_margin_sd_8Y = 
-      slide_dbl(gross_margin_1Y, ~sd(.x[c(1, 13, 25, 37, 49, 61, 73, 85)]), 
-                .before = 8*12-12),
-    gross_margin_stability_8Y = gross_margin_avg_8Y/gross_margin_sd_8Y,
-    operating_profit_margin_sd_3Y = 
-      slide_dbl(operating_profit_margin_1Y, ~sd(.x[c(1, 13, 25)]), 
-                .before = 3*6-12),
-    gross_margin_pct_chg_1Y = gross_margin_1Y / lag(gross_margin_1Y, 12) - 1,
-    gross_margin_mean_growth_8Y = 
-      slide_dbl(gross_margin_pct_chg_1Y, 
-                ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
-                .before = 8*12-12, .complete = TRUE),
-    scaled_total_accruals = ((total_current_assets -
-                                cash_and_short_term_investments) -
-                               (total_current_liabilities - 
-                                  (short_long_term_debt - 
-                                     lag(short_long_term_debt, 12))) - 
-                               depreciation_amortization_1Y) / total_assets,
-    scaled_net_operating_assets = ((total_assets - 
-                                      cash_and_short_term_investments) - 
-                                     (total_assets - short_long_term_debt -
-                                        (total_liabilities -
-                                           total_current_liabilities) - 
-                                        (total_assets - total_liabilities))) /
-      total_assets,
-    days_sales_outstanding = 365 / (revenue_1Y / net_receivables),
-    debt_ratio = total_liabilities / total_assets,
-    working_cap_ex_cash = total_current_assets - 
-      cash_and_short_term_investments - total_current_liabilities,
-    total_accruals_to_total_assets = (working_cap_ex_cash - 
-                                        lag(working_cap_ex_cash, 12) -
-                                        depreciation_amortization_1Y) /
-      total_assets,
-    working_capital = total_current_assets - cash_and_short_term_investments -
-      total_current_liabilities,
-    free_cash_flow_1Y = net_income_1Y + depreciation_amortization_1Y - 
-      c(NA, diff(working_capital)) + cash_from_investing_activities_1Y,
-    free_cash_flow_to_assets = free_cash_flow_1Y / total_assets,
-    lt_debt_ratio = (total_liabilities - total_current_liabilities) / 
-      total_assets,
-    lt_debt_ratio_pct_chg_1Y = lt_debt_ratio / lag(lt_debt_ratio, 12) - 1,
-    working_capital_pct_chg_1Y = working_capital / 
-      lag(working_capital, n = 12) - 1,
-    asset_turnover = revenue_1Y / total_assets,
-    excess_cash = cash_and_short_term_investments + total_current_assets -
-      total_current_liabilities,
-    total_debt = total_liabilities - total_current_liabilities +
-      short_long_term_debt,
-    enterprise_value = market_cap + total_debt - excess_cash,
-    ebit_to_ev = operating_income_loss_1Y / enterprise_value,
-    
-    # !!! Not used
-    # current_enterprise_value = current_shares_basic * current_close + 
-    # last(total_debt) - last(excess_cash),
-    # current_ebit_to_ev = operating_income_loss / current_enterprise_value,
-    
-    market_value_of_total_assets = total_liabilities + market_cap,
-    net_income_to_market_value_of_total_assets = 
-      net_income_1Y / market_value_of_total_assets,
-    total_liabilities_to_market_value_of_total_assets =
-      total_liabilities / market_value_of_total_assets,
-    cash_to_market_value_of_total_assets =
-      cash_and_short_term_investments /
-      market_value_of_total_assets,
-    book_value_adj_6m = total_stockholder_equity + 
-      .1 * (market_cap - total_stockholder_equity),
-    
-    # Calculate indexes used to detect chance of earnings manipulation
-    days_sales_outstanding_index = days_sales_outstanding / 
-      lag(days_sales_outstanding, 12),
-    gross_margin_index = lag(gross_margin_1Y, 12) / 
-      gross_margin_1Y,
-    asset_quality_index = (total_assets - total_current_assets -
-                             property_plant_equipment) / total_assets,
-    sales_growth_index = revenue_1Y / lag(revenue_1Y, 12),
-    depreciation_index = ifelse(depreciation_amortization_1Y == 0, NA, 
-                                lag(depreciation_amortization_1Y, 12) /
-                                  depreciation_amortization_1Y),
-    sga_index = selling_general_administrative_1Y / 
-      lag(selling_general_administrative_1Y, 12),
-    leverage_index = debt_ratio / lag(debt_ratio, 12)) %>% 
-  select(-revenue_1Q_est)
-  
-  return(ratios)
+      cash_and_short_term_investments =
+        replace_na(cash_and_short_term_investments, 0)
+      )
 }
 
 
-# get_ratios(x = fundamentals_filled %>% filter(ticker == "AAPL"))
-# ==# Slow! ~ 6 min
+
+
+## Slow! ~ 6 mins
 start9 <- Sys.time()
-ratios <- get_ratios(fundamentals_filled)
-end9 <- Sys.time(); end9 - start9
+ratios <- 
+  combined_fundamentals_merged %>%
+  append_derived_values() %>% 
+  append_price_stats() %>% 
+  append_filled_values() %>% 
+  append_cleaned_values() %>% 
+  append_profitability_ratios() %>% 
+  select(!ends_with("_filled")) %>% 
+  append_liquidity_solvency_ratios() %>% 
+  append_manipulation_metrics() %>% 
+  append_activity_ratios()
+end9 <- Sys.time(); end9 - start9  
 
 the_end <- Sys.time(); the_end - the_start # ~ 15 mins
-
-
-group_1 <- 1:22
-group_2 <- c(1, 2, 23:)
-
-ratios %>% 
-  select(ticker, report_date, contains("index")) %>% 
-  colnames()
-
-
-
 
 # Save
 fwrite(ratios, paste0("data/cleaned data/", "ratios ", 
@@ -2486,49 +1995,11 @@ fwrite(ratios, paste0("data/cleaned data/", "ratios ",
 
 
 
-
 source("helper functions.R")
-
-# Read
 ratios_file <- list.files("data/cleaned data", pattern = "ratios ",
                           full.names = TRUE) %>% max()
 ratios <- read_tibble(ratios_file)
 
-      
-# Liquidity - current ratio, cash ratio, DSO (Avg AR, net / Sales * 365), DPO (Avg. AP, net / COGS * 365),...
-# Solvency - Debt ratio, D/E, Interest coverage ratio (EBIT / interest expense, net), LT debt to assets ratio
-# Profitability - net profit margin, ROA, ROE, Asset turnover
-
-# ratios %>% filter(ticker == "PLTR")
-# ratios %>% filter(ticker == "SOFI")
-# ratios %>% distinct(ticker) %>% nrow()
-
-
-profile_data_consolidated_file <- 
-  list.files(paste0(dir_data, "data/cleaned data"), 
-             pattern = "^profile_data_consolidated", full.names = TRUE) %>% max()
-profile_data <- read_tibble(profile_data_consolidated_file)
-
-
-
-
-
-
-# Add sector/industry details
-ratios_joined <-
-  ratios %>% 
-  select(!ends_with("est")) %>% 
-  left_join(
-    profile_data %>% 
-              select(ticker, 
-                     report_date,
-                     shares_basic_sec_ind = shares_basic,
-                     short_ratio = short_ratio,
-                     held_percent_institutions)
-    ) %>% 
-  left_join(profile_data %>% select(where(is.character)))
-    # filter(!is.na(revenue) & !is.na(total_assets)) %>% 
-    # select(!(selling_general_administrative:total_stockholder_equity), total_assets) %>% 
 
 
 # WILL5000INDFC	Wilshire 5000 Total Market;Full Cap Index; Index; Daily; Not seasonally adjusted
@@ -2538,59 +2009,49 @@ prices_from_FRED <-
 index_WILL5000 <- read_tibble(prices_from_FRED) %>% 
   filter(symbol == "WILL5000INDFC")
 
-
 # !!! Get total market cap data (Couldn't find online)
 
-
-# Estimate total market cap
-total_market_caps <-
-  ratios_joined %>%
-  select(ticker, report_date, market_cap) %>%
-  group_by(report_date) %>%
-  summarize(total_market_cap = sum(market_cap,
-                                   na.rm = TRUE)) %>% 
-  mutate(total_market_cap = na_if(total_market_cap, 0))
-
-  
-
-
-# library(ggplot2)
-# total_market_caps %>%
-#     mutate(total_market_cap = as.numeric(total_market_cap)) %>% 
-#     ggplot(aes(fundamentals_date, total_market_cap)) +
-#     geom_col()
-    
-    
-
-
-
-# Add total market caps
+# Append total market caps
 ratios_w_market_caps <-
-  ratios_joined %>% 
+  ratios %>%
+  group_by(report_date) %>%
+  mutate(total_market_cap = sum(market_cap,
+                                na.rm = TRUE)) %>% 
   ungroup() %>% 
-  # mutate(decision_date_6m_forward = as.Date(decision_date_6m_forward)) %>% 
-  left_join(
-    total_market_caps
-    ) %>% 
-  as.data.table() %>% unique() %>% as_tibble()
+  mutate(total_market_cap = na_if(total_market_cap, 0)) %>% 
+  distinct()
+
+profile_data_final_file <- 
+  list.files(paste0(dir_data, "data/cleaned data"), 
+             pattern = "^profile_data_final", full.names = TRUE) %>% max()
+profile_data <- read_tibble(profile_data_final_file)
+
+ratios_w_profile_data <-
+  ratios_w_market_caps %>% 
+  left_join(profile_data) %>%
+  group_by(ticker) %>% 
+  fill(starts_with("industry_") | starts_with("sector_"),
+       .direction = "downup") %>%
+  mutate(across(starts_with("industry_") | starts_with("sector_"),
+                       ~replace_na(.x, "unknown"))) %>% 
+  ungroup()
 
 
-# Tickers with multiple sector categories
-if(nrow(ratios_w_market_caps %>%
+# If any ticker has multiple sector_yhoo values, stop
+if(nrow(ratios_w_profile_data %>%
         distinct(ticker, sector_yhoo) %>% 
         filter(sector_yhoo != "") %>% 
         count(ticker) %>% 
-        arrange(desc(n)) %>% 
         filter(n > 1)) > 0) stop()
 
 
 # Replace strange Japanese characters and excessive underscores in 
 # sector and industry variables
-ratios_cleaned_categories <- 
-  ratios_w_market_caps %>% 
-  mutate(across(where(is.character), 
-                # Remove strange characters from strings
-                ~ str_replace_all(.x, "[^\u0001-\u007F]", "")))
+# ratios_cleaned_categories <- 
+#   ratios_w_profile_data %>%
+#   mutate(across(where(is.character), 
+#                 # Remove strange characters from strings
+#                 ~ str_replace_all(.x, "[^\u0001-\u007F]", "")))
 
 
 
@@ -2651,21 +2112,17 @@ consolidate_categories <- function(data, field = "sector_yhoo") {
   
 }
 
-
-
-ratios_cleaned_categories %>% select(contains("sector")) %>% colnames()
-ratios_cleaned_categories %>% select(contains("industry")) %>% colnames()
-
+# ratios_cleaned_categories %>% select(contains("sector")) %>% colnames()
+# ratios_cleaned_categories %>% select(contains("industry")) %>% colnames()
 
 ratios_final <-
-  ratios_cleaned_categories %>% 
+  ratios_w_profile_data %>% 
   consolidate_categories(field = "sector_yhoo") %>% 
   consolidate_categories(field = "sector_simfin") %>% 
   consolidate_categories(field = "industry_edgar") %>% 
   consolidate_categories(field = "industry_detail_edgar") %>% 
   consolidate_categories(field = "industry_yhoo") %>% 
   consolidate_categories(field = "industry_simfin")
-
 
 
 # ratios_cleaned_categories  %>% 
@@ -2675,33 +2132,39 @@ ratios_final <-
 #   fill(name_edgar, .direction = "downup") %>% 
 #   as.data.table() %>% unique() %>% as_tibble()
 
-
-
 # Save to this project's data directory
-fwrite(ratios_final, paste0(dir_data, "data/cleaned data/ratios_final (", 
-                            Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+ratios_final %>%
+  mutate(file_name = industry_yhoo) %>%
+  group_by(file_name) %>% 
+  group_walk(~ write_csv(.x, paste0("data/cleaned data/by industry/ratios - ", 
+                                   .y$file_name, ".csv")))
+
 # Save to stock-analysis data directory
-fwrite(ratios_final, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned/ratios_final (", 
-                            Sys.Date() %>% str_replace_all("-", " "), ").csv"))
+# - Remove old files
+file.remove(list.files("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/by industry", pattern = "ratios - ", full.names = TRUE))
+# Copy new files
+file.copy(list.files("data/cleaned data/by industry", pattern = "ratios - ", full.names = TRUE), "C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/by industry", overwrite = TRUE)
 
 
-# ratios_final %>% filter(ticker == "PLTR")
-# ratios_final %>% filter(ticker == "SOFI")
+profiles_final <- 
+  ratios_final %>% 
+  select(ticker, contains("name"), contains("sector"), contains("industry"),
+         contains("summary")) %>% 
+  distinct()
+
+# Save to "stock-analysis" project directory
+fwrite(profiles_final, 
+       "C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-analysis/data/cleaned data/profiles_final.csv")
+
 
 
 
 # source("helper functions.R")
-
-file_ratios_final <- 
-  list.files(paste0(dir_data, "data/cleaned data"), pattern = "ratios_final", 
-             full.names = TRUE) %>% max()
-ratios_final <- read_tibble(file_ratios_final)
-
-
-
-
-
-
+ratios_final_files <-
+  list.files(paste0(dir_data, "data/cleaned data/by industry"), 
+             pattern = "ratios - ", full.names = TRUE)
+ratios_final <- ratios_final_files %>% 
+  map_df(read_tibble)
 
 
 
@@ -2732,27 +2195,42 @@ plotly::ggplotly(plot, tooltip = "text")
 
 # skimr::skim(ratios_final)
 
+# sector_industry_fields <- 
+#   ratios_final %>% 
+#   select(contains("sector") | contains("industry")) %>% 
+#   colnames()
+
+name_sector_industry_fields <- 
+  ratios_final %>%
+  colnames() %>% 
+  str_subset("^sector_|^industry_|^name_")
+
+
 fields_to_use <-
-      ratios_final %>%
-      summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
-      gather() %>% 
-      arrange(value) %>%
-      filter(value < 0.35) %>% 
-      pull(key) %>% 
-      .[!str_starts(., "decision")]
-      # .[!. %in% c("working_capital_pct_chg_1Y", "name_edgar", "industry_edgar",
-      #             "industry_detail_edgar", "name_simfin", "sector_simfin",
-      #             "industry_simfin", "total_stockholder_equity")]
+  ratios_final %>%
+  select(!all_of(name_sector_industry_fields)) %>% 
+  summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
+  gather() %>% 
+  arrange(value) %>%
+  filter(value < 0.8) %>% 
+  pull(key) %>%
+  unique()
+fields_to_use
+  # .[!. %in% c("working_capital_pct_chg_1Y", "name_edgar", "industry_edgar",
+  #             "industry_detail_edgar", "name_simfin", "sector_simfin",
+  #             "industry_simfin", "total_stockholder_equity")]
 
 
 
 
 # 5 Years
 ratios_complete_set_5y <-
-      get_complete_series(data = ratios_final, 
-                          years = 5,
-                          fields = fields_to_use)
-ratios_complete_set_5y %>% distinct(ticker) # 257 --> 1,997 tickers
+  get_complete_series(data = ratios_final, 
+                      years = 5,
+                      fields = fields_to_use) %>% 
+  left_join(ratios_final %>% 
+              select(ticker, report_date, all_of(name_sector_industry_fields)))
+ratios_complete_set_5y %>% distinct(ticker) # 257 --> 1,997 tickers --> 312
 ratios_complete_set_5y %>% 
   summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
 
@@ -2761,7 +2239,7 @@ ratios_complete_set_8y <-
       get_complete_series(data = ratios_final, 
                           years = 8,
                           fields = fields_to_use)
-ratios_complete_set_8y %>% distinct(ticker) # 159 --> 1,475 tickers
+ratios_complete_set_8y %>% distinct(ticker) # 159 --> 1,475 tickers --> 193
 ratios_complete_set_8y %>% 
   summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
 
@@ -2770,7 +2248,7 @@ ratios_complete_set_10y <-
   get_complete_series(data = ratios_final, 
                       years = 10,
                       fields = fields_to_use)
-ratios_complete_set_10y %>% distinct(ticker) # 32 --> 1,290 tickers
+ratios_complete_set_10y %>% distinct(ticker) # 32 --> 1,290 tickers --> 76
 ratios_complete_set_10y %>% 
   summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
 
@@ -2795,10 +2273,12 @@ fwrite(ratios_complete_set_10y,
 # Load libraries and helper functions
 source("helper functions.R")
 
-ratios_final_file <- 
-  list.files(paste0(dir_data, "data/cleaned data"), pattern = "ratios_final", 
-             full.names = TRUE) %>% max()
-ratios_final <- read_tibble(ratios_final_file)
+ratios_final_files <-
+  list.files(paste0(dir_data, "data/cleaned data/by industry"), 
+             pattern = "ratios - ", full.names = TRUE)
+ratios_final <- ratios_final_files %>% 
+  map_df(read_tibble)
+
 
 
 # ratios_final %>% filter(ticker == "SOFI") %>% pull(industry_yhoo)

@@ -134,25 +134,16 @@ read_and_clean <- function(file) {
 # Given tickers and fields, find a complete series of data, if it exists
 # Reduce range of tickers and dates to get a complete series for a given field
 get_complete_series <- function(data, fields, years = 5) {
-    #######
-    # data <- ratios_final
-    # years <- 8
-    # fields <- fields_to_use
     
-    # fields <- c("ticker", "fundamentals_date", "sector_yhoo",
-    # "free_cash_flow_to_assets", "operating_income_1Q")
-    # fields <- c("ticker",
-    #            "fundamentals_date",
-    #            "sector_yhoo",
-    #            "adj_return_6M",
-    #            "free_cash_flow_to_assets",
-    #            # "leverage_index",
-    #            "total_accruals_to_total_assets")
-    #######
+  #######
+  # data <- ratios_final
+  # years <- 5
+  # fields <- fields_to_use
+  #######
     
   # Find tickers that have at least the required years
   tickers_to_keep <-
-    data %>% 
+    data %>%
     count(ticker) %>% 
     filter(n >= years*12) %>% 
     pull(ticker)
@@ -186,21 +177,21 @@ get_complete_series <- function(data, fields, years = 5) {
   
   # Get most complete date range
   data_cl_dates <-
-      data_subset %>% 
+      data_subset %>%
       filter(between(report_date, 
                      date_range_w_least_nas$min_date, 
                      date_range_w_least_nas$max_date))
   
   # Get tickers with no NAs in most complete date range
   tickers_to_use <-
-      data_cl_dates %>% 
-      select(-report_date) %>% 
-      group_by(ticker) %>% 
-      nest() %>% 
-      transmute(ticker,
-                na_count = sum(is.na(unlist(data)))) %>% 
-      filter(na_count == 0) %>% 
-      pull(ticker)
+    data_cl_dates %>% filter(ticker == "AAPL") %>% View()
+    select(-report_date) %>% 
+    group_by(ticker) %>% 
+    nest() %>% 
+    transmute(ticker,
+              na_count = sum(is.na(unlist(data)))) %>% 
+    filter(na_count == 0) %>% 
+    pull(ticker)
   
   if(length(tickers_to_use) == 0) 
       warning("Not enough data available for chosen inputs.")
@@ -208,28 +199,28 @@ get_complete_series <- function(data, fields, years = 5) {
   
   # Clean the sector_yhoo variable by setting sector_yhoo equal to the
   #  first observed value for each ticker
-  data_cl_sector <-
-    # Use "data_subset" if you want to include data that might exist outside the 
-    # date range
-    # data_subset %>% 
-    data_cl_dates %>% 
-    filter(ticker %in% tickers_to_use) %>% 
-    # Set the sector of the ticker to the first observed sector value
-    # (ticker MGPI had two unique sectors)
-    group_by(ticker) %>% 
-    mutate(sector_yhoo = first(sector_yhoo)) %>% 
-    ungroup() %>% 
-    as.data.table() %>% 
-    unique() %>% 
-    setorder(ticker, report_date) %>% 
-    as_tibble()
+  # data_cl_sector <-
+  #   # Use "data_subset" if you want to include data that might exist outside the 
+  #   # date range
+  #   # data_subset %>% 
+  #   data_cl_dates %>%
+  #   filter(ticker %in% tickers_to_use) %>%
+  #   # Set the sector of the ticker to the first observed sector value
+  #   # (ticker MGPI had two unique sectors)
+  #   group_by(ticker) %>% 
+  #   mutate(sector_yhoo = first(sector_yhoo)) %>% 
+  #   ungroup() %>% 
+  #   as.data.table() %>% 
+  #   unique() %>% 
+  #   setorder(ticker, report_date) %>% 
+  #   as_tibble()
   
   # If there are any NAs remaining, raise a warning.
-  if(data_cl_sector %>% is.na() %>% any()) 
+  if(data_cl_dates %>% is.na() %>% any()) 
       warning("There are some NAs in the data.")
   
   date_diffs <-
-    data_cl_sector %>% 
+    data_cl_dates %>% 
     as.data.table() %>% 
     setorder(report_date) %>% 
     as_tibble() %>% 
@@ -239,11 +230,6 @@ get_complete_series <- function(data, fields, years = 5) {
     # Replace each initial NA with a safe number, 30, 
     #  so that the row isn't dropped later
     mutate(date_diff = replace(date_diff, row_number() == 1, 30))
-  
-  # date_diffs[!dplyr::between(date_diffs$date_diff, 27, 32), , drop = FALSE]
-
-  # data_cl_sector %>% filter(ticker == "COST") %>% View()
-  # date_diffs %>% arrange(date_diff)
   
   
   # If any of the date differences are not between 27 and 32, then stop
@@ -297,3 +283,412 @@ get_recent_price_dirs <- function(pattern = "prices",
 
 
 
+append_derived_values <- function(x) {
+  x %>% 
+    group_by(ticker) %>% 
+    mutate(
+      total_stockholder_equity = total_assets - total_liabilities,
+      market_cap = close * shares_basic,
+      capital = property_plant_equipment + total_current_assets -
+        total_current_liabilities - cash_and_short_term_investments,
+      working_cap_ex_cash = total_current_assets - 
+        cash_and_short_term_investments - total_current_liabilities,
+      
+      working_capital = total_current_assets - cash_and_short_term_investments -
+        total_current_liabilities,
+      free_cash_flow_1Y = net_income_1Y + depreciation_amortization_1Y - 
+        c(NA, diff(working_capital)) + cash_from_investing_activities_1Y,
+      excess_cash = cash_and_short_term_investments + total_current_assets -
+        total_current_liabilities,
+      total_debt = total_liabilities - total_current_liabilities +
+        short_long_term_debt,
+      enterprise_value = market_cap + total_debt - excess_cash,
+      market_value_of_total_assets = total_liabilities + market_cap
+    ) %>% 
+    ungroup()
+}
+
+append_price_stats <- function(x) {
+  x %>% 
+    group_by(ticker) %>%
+    mutate(
+      adj_return_3M = slide_dbl(adjusted, ~log(.x[4]/.x[1]), 
+                                .before = 4-1, .complete = TRUE),
+      adj_return_6M = slide_dbl(adjusted, ~log(.x[7]/.x[1]), .before = 7-1, 
+                                .complete = TRUE),
+      adj_return_1Y = slide_dbl(adjusted, ~log(.x[13]/.x[1]), .before = 12-1, 
+                                .complete = TRUE),
+      adj_return_3Y = slide_dbl(adjusted, ~log(.x[37]/.x[1]), .before = 3*12-1,
+                                .complete = TRUE)
+    ) %>% 
+    ungroup()
+}
+
+append_filled_values <- function(x) {
+  x %>% 
+    group_by(ticker) %>% 
+    mutate(
+      revenue_1Y_filled = 
+        fill_na_two_periods_max(revenue_1Y),
+      revenue_1Q_filled = 
+        fill_na_two_periods_max(revenue_1Q),
+      operating_income_loss_1Y_filled = 
+        fill_na_two_periods_max(operating_income_loss_1Y),
+      operating_income_loss_1Q_filled = 
+        fill_na_two_periods_max(operating_income_loss_1Q),
+      gross_profit_1Y_filled = 
+        fill_na_two_periods_max(gross_profit_1Y),
+      gross_profit_1Q_filled = 
+        fill_na_two_periods_max(gross_profit_1Q),
+      cash_from_operating_activities_1Y_filled = 
+        fill_na_two_periods_max(cash_from_operating_activities_1Y),
+      cash_from_operating_activities_1Q_filled = 
+        fill_na_two_periods_max(cash_from_operating_activities_1Q),
+      cash_from_investing_activities_1Q_filled =
+        fill_na_two_periods_max(cash_from_investing_activities_1Q),
+      cash_from_financing_activities_1Q_filled = 
+        fill_na_two_periods_max(cash_from_financing_activities_1Q),
+      net_income_common_1Y_filled =  
+        fill_na_two_periods_max(net_income_common_1Y),
+      net_income_common_1Q_filled =
+        fill_na_two_periods_max(net_income_common_1Q),
+      net_income_1Y_filled = 
+        fill_na_two_periods_max(net_income_1Y), 
+      net_income_1Q_filled = 
+        fill_na_two_periods_max(net_income_1Q),
+      total_assets_filled =
+        fill_na_two_periods_max(total_assets),
+      total_liabilities_filled = 
+        fill_na_two_periods_max(total_liabilities),
+      total_stockholder_equity_filled =
+        fill_na_two_periods_max(total_stockholder_equity),
+      capital_filled = 
+        fill_na_two_periods_max(capital)
+    ) %>% 
+    ungroup()
+}
+
+append_cleaned_values <- function(x) {
+  x %>% 
+    group_by(ticker) %>% 
+    mutate(
+      # Estimate 4th quarter's value from yearly data and data from previous
+      # 3 quarters
+      revenue_1Q_est =
+        slide2_dbl(revenue_1Y, 
+                   revenue_1Q_filled,
+                   ~ .x[10] - sum(.y[c(1, 4, 7)]),
+                   .before = 9, .complete = TRUE
+        ),
+      operating_income_loss_1Q_est =
+        slide2_dbl(operating_income_loss_1Y, 
+                   operating_income_loss_1Q_filled,
+                   ~ .x[10] - sum(.y[c(1, 4, 7)]),
+                   .before = 9, .complete = TRUE
+        ),
+      gross_profit_1Q_est =
+        slide2_dbl(gross_profit_1Y, 
+                   gross_profit_1Q_filled,
+                   ~ .x[10] - sum(.y[c(1, 4, 7)]),
+                   .before = 9, .complete = TRUE
+        ),
+      cash_from_operating_activities_1Q_est =
+        slide2_dbl(
+          cash_from_operating_activities_1Y,
+          cash_from_operating_activities_1Q_filled,
+          ~ .x[10] - sum(.y[c(1, 4, 7)]),
+          .before = 9, .complete = TRUE
+        ),
+      net_income_common_1Q_est =
+        slide2_dbl(net_income_common_1Y, 
+                   net_income_common_1Q_filled,
+                   ~ .x[10] - sum(.y[c(1, 4, 7)]),
+                   .before = 9, .complete = TRUE
+        ),
+      net_income_1Q_est =
+        slide2_dbl(net_income_1Y, 
+                   net_income_1Q_filled,
+                   ~ .x[10] - sum(.y[c(1, 4, 7)]),
+                   .before = 9, .complete = TRUE
+        )
+    ) %>% 
+    # Consolidate columns (Choose first non-NA value from two columns)
+    mutate(
+      revenue_1Q = 
+        coalesce(
+          revenue_1Q, 
+          revenue_1Q_est
+        ),
+      operating_income_loss_1Q = 
+        coalesce(
+          operating_income_loss_1Q,
+          operating_income_loss_1Q_est
+        ),
+      gross_profit_1Q = coalesce(
+        gross_profit_1Q, 
+        gross_profit_1Q_est
+      ),
+      cash_from_operating_activities_1Q =
+        coalesce(
+          cash_from_operating_activities_1Q,
+          cash_from_operating_activities_1Q_est
+        ),
+      net_income_common_1Q = coalesce(
+        net_income_common_1Q,
+        net_income_common_1Q_est
+      ),
+      net_income_1Q = 
+        coalesce(
+          net_income_1Q, 
+          net_income_1Q_est
+        )
+    ) %>% 
+    # Estimate yearly (1Y) values by adding previous 4 quarters of data,
+    #  using back-filled (estimated) values from above
+    mutate(
+      revenue_1Y_est =
+        slide_dbl(revenue_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      gross_profit_1Y_est =
+        slide_dbl(gross_profit_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      operating_income_loss_1Y_est =
+        slide_dbl(operating_income_loss_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      net_income_common_1Y_est =
+        slide_dbl(net_income_common_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      net_income_1Y_est =
+        slide_dbl(net_income_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      cash_from_operating_activities_1Y_est =
+        slide_dbl(cash_from_operating_activities_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      cash_from_investing_activities_1Y_est =
+        slide_dbl(cash_from_investing_activities_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        ),
+      cash_from_financing_activities_1Y_est =
+        slide_dbl(cash_from_financing_activities_1Q,
+                  ~ sum(.x[c(1, 4, 7, 10)]),
+                  .before = 10 - 1, .complete = TRUE
+        )
+    ) %>% 
+    # Consolidate columns (Choose first non-NA value from two columns)
+    mutate(
+      revenue_1Y = 
+        coalesce(
+          revenue_1Y, 
+          revenue_1Y_est
+        ),
+      
+      gross_profit_1Y = 
+        coalesce(
+          gross_profit_1Y, 
+          gross_profit_1Y_est
+        ),
+      operating_income_loss_1Y = 
+        coalesce(
+          operating_income_loss_1Y,
+          operating_income_loss_1Y_est
+        ),
+      net_income_common_1Y = 
+        coalesce(
+          net_income_common_1Y,
+          net_income_common_1Y_est
+        ),
+      net_income_1Y = 
+        coalesce(
+          net_income_1Y, 
+          net_income_1Y_est
+        ),
+      cash_from_operating_activities_1Y =
+        coalesce(
+          cash_from_operating_activities_1Y,
+          cash_from_operating_activities_1Y_est
+        ),
+      cash_from_investing_activities_1Y =
+        coalesce(
+          cash_from_investing_activities_1Y,
+          cash_from_investing_activities_1Y_est
+        ),
+      cash_from_financing_activities_1Y =
+        coalesce(
+          cash_from_financing_activities_1Y,
+          cash_from_financing_activities_1Y_est
+        )
+    ) %>%
+    ungroup() %>% 
+    select(!ends_with("_est"))
+}
+
+append_profitability_ratios <- function(x) {
+  x %>% 
+    group_by(ticker) %>% 
+    mutate(
+      gross_margin_1Q = ifelse(gross_profit_1Q == revenue_1Q, NA, 
+                               gross_profit_1Q / revenue_1Q),
+      gross_margin_1Y = ifelse(gross_profit_1Y == revenue_1Y_filled, NA, 
+                               gross_profit_1Y / revenue_1Y),
+      operating_profit_margin_1Y = 
+        operating_income_loss_1Y / revenue_1Y,
+      net_profit_margin = net_income_common_1Y / revenue_1Y,
+      roe = ifelse(total_stockholder_equity > 0, 
+                   net_income_1Y / 
+                     lag(total_stockholder_equity_filled, 12), NA),
+      roa = net_income_common_1Y / lag(total_assets_filled, 12),
+      roc = operating_income_loss_1Y / lag(capital_filled, 12),
+      roc_mean_3Y = 
+        slide_dbl(roc, 
+                  ~prod(1 + .x[c(1, 13, 25)])^(1/(3*12))-1, 
+                  .before = 3*12-12, .complete = TRUE),
+      roe_mean_3Y = 
+        slide_dbl(roe, 
+                  ~prod(1 + .x[c(1, 13, 25)])^(1/(3*12))-1, 
+                  .before = 3*12-12, .complete = TRUE),
+      roa_mean_3Y = 
+        slide_dbl(roa, 
+                  ~prod(1 + .x[c(1, 13, 25)])^(1/(3*12))-1, 
+                  .before = 3*12-12, .complete = TRUE),
+      roc_mean_8Y = 
+        slide_dbl(roc, 
+                  ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
+                  .before = 8*12-12, .complete = TRUE),
+      roe_mean_8Y = 
+        slide_dbl(roe, 
+                  ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
+                  .before = 8*12-12, .complete = TRUE),
+      roa_mean_8Y = 
+        slide_dbl(roa, 
+                  ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
+                  .before = 8*12-12, .complete = TRUE),
+      pe = market_cap / net_income_1Y_filled,
+      accruals_pct_chg_1Y = 
+        (net_income_1Y - cash_from_operating_activities_1Y) / 
+        lag((net_income_1Y_filled - cash_from_operating_activities_1Y_filled), 12),
+      gross_margin_avg_3Y = 
+        slide_dbl(gross_margin_1Y, 
+                  ~mean(.x[c(1, 13, 25)]), 
+                  .before = 3*6-12, .complete = TRUE),
+      gross_margin_sd_3Y = 
+        slide_dbl(gross_margin_1Y, 
+                  ~sd(.x[c(1, 13, 25)]), 
+                  .before = 3*6-12, .complete = TRUE), 
+      gross_margin_stability_3Y = gross_margin_avg_3Y / gross_margin_sd_3Y,
+      gross_margin_avg_8Y = 
+        slide_dbl(gross_margin_1Y, 
+                  ~mean(.x[c(1, 13, 25, 37, 49, 61, 73, 85)]),
+                  .before = 8*12-12, .complete = TRUE),
+      gross_margin_sd_8Y = 
+        slide_dbl(gross_margin_1Y, 
+                  ~sd(.x[c(1, 13, 25, 37, 49, 61, 73, 85)]), 
+                  .before = 8*12-12, .complete = TRUE),
+      gross_margin_stability_8Y = gross_margin_avg_8Y / gross_margin_sd_8Y,
+      operating_profit_margin_sd_3Y = 
+        slide_dbl(operating_profit_margin_1Y, 
+                  ~sd(.x[c(1, 13, 25)]), 
+                  .before = 3*6-12, .complete = TRUE),
+      gross_margin_pct_chg_1Y = 
+        gross_margin_1Y / lag(gross_margin_1Y, 12) - 1,
+      gross_margin_mean_growth_8Y = 
+        slide_dbl(gross_margin_pct_chg_1Y, 
+                  ~prod(1 + .x[c(1, 13, 25, 37, 49, 61, 73, 85)])^(1/(8*12))-1,
+                  .before = 8*12-12, .complete = TRUE),
+      gross_margin_index = 
+        lag(gross_margin_1Y, 12) / gross_margin_1Y
+    ) %>% 
+    ungroup() %>% 
+    select(!ends_with("_filled"))
+}
+
+append_liquidity_solvency_ratios <- function(x) {
+  x %>%
+    group_by(ticker) %>%
+    mutate(
+      cash_ratio = cash_and_short_term_investments / total_current_liabilities,
+      current_ratio = total_current_assets / total_current_liabilities,
+      debt_ratio = total_liabilities / total_assets,
+      lt_debt_ratio = (total_liabilities - total_current_liabilities) /
+        total_assets,
+      debt_to_equity = total_liabilities / total_stockholder_equity,
+      # interest_coverage_ratio = EBIT / net_interest_expense,
+      lt_debt_ratio_pct_chg_1Y = lt_debt_ratio / lag(lt_debt_ratio, 12) - 1,
+      total_liabilities_to_market_value_of_total_assets =
+        total_liabilities / market_value_of_total_assets,
+      cash_to_market_value_of_total_assets =
+        cash_and_short_term_investments /
+        market_value_of_total_assets,
+      book_value_adj = total_stockholder_equity +
+        .1 * (market_cap - total_stockholder_equity),
+      leverage_index = debt_ratio / lag(debt_ratio, 12)
+    ) %>%
+    ungroup()
+}
+
+append_manipulation_metrics <- function(x) {
+  x %>% 
+    group_by(ticker) %>% 
+    mutate(
+      scaled_total_accruals = 
+        ((total_current_assets - cash_and_short_term_investments) -
+           (total_current_liabilities - 
+              (short_long_term_debt - lag(short_long_term_debt, 12))) - 
+           depreciation_amortization_1Y) / total_assets,
+      scaled_net_operating_assets = ((total_assets - 
+                                        cash_and_short_term_investments) - 
+                                       (total_assets - short_long_term_debt -
+                                          (total_liabilities -
+                                             total_current_liabilities) - 
+                                          (total_assets - total_liabilities))) /
+        total_assets,
+      total_accruals_to_total_assets = (working_cap_ex_cash - 
+                                          lag(working_cap_ex_cash, 12) -
+                                          depreciation_amortization_1Y) /
+        total_assets,
+      asset_quality_index = (total_assets - total_current_assets -
+                               property_plant_equipment) / total_assets
+    ) %>% 
+    ungroup()
+}
+
+append_activity_ratios <- function(x) {
+  x %>% 
+    group_by(ticker) %>% 
+    mutate(
+      asset_turnover = revenue_1Y / total_assets,
+      working_capital_pct_chg_1Y = working_capital / 
+        lag(working_capital, n = 12) - 1,
+      sales_growth_index = revenue_1Y / lag(revenue_1Y, 12),
+      depreciation_index = ifelse(depreciation_amortization_1Y == 0, NA, 
+                                  lag(depreciation_amortization_1Y, 12) /
+                                    depreciation_amortization_1Y),
+      sga_index = selling_general_administrative_1Y / 
+        lag(selling_general_administrative_1Y, 12),
+      # Assumes all sales are credit sales
+      days_sales_outstanding = 
+        mean(net_receivables, lag(net_receivables, 12)) / 
+        revenue_1Y * 365, 
+      days_sales_outstanding_index = days_sales_outstanding / 
+        lag(days_sales_outstanding, 12),
+      # days_sales_outstanding = 365 / (revenue_1Y / net_receivables),
+      
+      # Assumes all COGS are short-term accruals, not immediate cash costs
+      days_payables_outstanding = 
+        mean(accounts_payable, lag(accounts_payable, 12)) / 
+        (revenue_1Y - gross_profit_1Y) * 365
+    ) %>% 
+    ungroup()
+}
