@@ -66,11 +66,22 @@ library(quantmod)
 library(readxl)
 library(data.table)
 
+dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data/"
+
+
 symbols <- read_excel(paste0(dir_data, "FRED Tickers.xlsx"), 
                       col_names = TRUE, sheet = 1, range = "A1:B100") %>% 
     drop_na("FRED Symbol") %>% 
     pull("FRED Symbol") %>% 
     .[. != "USDX"]
+
+
+
+SP500TR <-
+    tidyquant::tq_get("^SP500TR", get = "stock.prices", from = "1999-12-31") %>% 
+    select(ticker = symbol, date, close, adjusted)
+    
+fwrite(SP500TR, paste0(dir_data, "SP500TR.csv"))
 
 
 # symb <- c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1", "DGS2", "DGS5", 
@@ -113,8 +124,7 @@ tickers <-
     read_lines(paste0(dir_data, 
                       "cleaned data/tickers_with_clean_prices.txt")) %>% 
     {.[. != "NA"]}
-
-# 13,764 tickers !!!
+# 14,609 tickers
 
 tickers_in_fundamentals <- 
     read_tibble(paste0(dir_data, "cleaned data/fundamentals_consolidated.csv")) %>% 

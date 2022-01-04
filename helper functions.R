@@ -1,5 +1,6 @@
 
-suppressPackageStartupMessages({
+suppressWarnings({
+# suppressPackageStartupMessages({
     library(arrow)
     library(tidyverse)
     library(lubridate)
@@ -136,7 +137,7 @@ read_and_clean <- function(file) {
 get_complete_series <- function(data, fields, years = 5) {
     
   #######
-  # data <- ratios_final
+  # data <- ratios_final_filled
   # years <- 5
   # fields <- fields_to_use
   #######
@@ -184,7 +185,7 @@ get_complete_series <- function(data, fields, years = 5) {
   
   # Get tickers with no NAs in most complete date range
   tickers_to_use <-
-    data_cl_dates %>% filter(ticker == "AAPL") %>% View()
+    data_cl_dates %>%
     select(-report_date) %>% 
     group_by(ticker) %>% 
     nest() %>% 
@@ -236,7 +237,7 @@ get_complete_series <- function(data, fields, years = 5) {
   if(!date_diffs %>% pull(date_diff) %>% between(., 27, 32) %>% all())
       warning("Some date sequences are incomplete.")
   
-  return(data_cl_sector)
+  return(data_cl_dates)
 }
 
 
@@ -284,6 +285,9 @@ get_recent_price_dirs <- function(pattern = "prices",
 
 
 append_derived_values <- function(x) {
+  #####
+  # x <- combined_fundamentals_merged
+  #####
   x %>% 
     group_by(ticker) %>% 
     mutate(
@@ -312,6 +316,8 @@ append_price_stats <- function(x) {
   x %>% 
     group_by(ticker) %>%
     mutate(
+      adj_return_1M = slide_dbl(adjusted, ~log(.x[2]/.x[1]), 
+                                .before = 2-1, .complete = TRUE),
       adj_return_3M = slide_dbl(adjusted, ~log(.x[4]/.x[1]), 
                                 .before = 4-1, .complete = TRUE),
       adj_return_6M = slide_dbl(adjusted, ~log(.x[7]/.x[1]), .before = 7-1, 
@@ -541,7 +547,7 @@ append_profitability_ratios <- function(x) {
     mutate(
       gross_margin_1Q = ifelse(gross_profit_1Q == revenue_1Q, NA, 
                                gross_profit_1Q / revenue_1Q),
-      gross_margin_1Y = ifelse(gross_profit_1Y == revenue_1Y_filled, NA, 
+      gross_margin_1Y = ifelse(gross_profit_1Y == revenue_1Y, NA, 
                                gross_profit_1Y / revenue_1Y),
       operating_profit_margin_1Y = 
         operating_income_loss_1Y / revenue_1Y,
@@ -665,6 +671,10 @@ append_manipulation_metrics <- function(x) {
 }
 
 append_activity_ratios <- function(x) {
+  ######
+  # x <- ratios
+  ######
+  
   x %>% 
     group_by(ticker) %>% 
     mutate(
@@ -677,18 +687,28 @@ append_activity_ratios <- function(x) {
                                     depreciation_amortization_1Y),
       sga_index = selling_general_administrative_1Y / 
         lag(selling_general_administrative_1Y, 12),
+    # select(ticker, report_date, net_receivables, revenue_1Y) %>% View(),
       # Assumes all sales are credit sales
-      days_sales_outstanding = 
-        mean(net_receivables, lag(net_receivables, 12)) / 
-        revenue_1Y * 365, 
+      days_sales_outstanding =
+        (net_receivables + lag(net_receivables, 12)) / 2 / revenue_1Y * 365,
       days_sales_outstanding_index = days_sales_outstanding / 
         lag(days_sales_outstanding, 12),
-      # days_sales_outstanding = 365 / (revenue_1Y / net_receivables),
-      
       # Assumes all COGS are short-term accruals, not immediate cash costs
       days_payables_outstanding = 
-        mean(accounts_payable, lag(accounts_payable, 12)) / 
+        (accounts_payable / lag(accounts_payable, 12)) /2 / 
         (revenue_1Y - gross_profit_1Y) * 365
     ) %>% 
     ungroup()
+}
+
+# Trim leading and laggind NAs
+trim_nas <- function(df, x) { 
+  # x <- c(NA, NA, 23, 43, NA, 2, NA, NA, NA)
+  df %>%
+    filter(
+      # Trim trailing NAs
+      cumsum(!is.na({{ x }})) != 0 & 
+        # Trim leading NAs
+        rev(cumsum(!is.na(rev({{ x }})))) != 0
+    )
 }

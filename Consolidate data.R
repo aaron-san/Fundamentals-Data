@@ -50,8 +50,10 @@ dir_data <- "C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # EDGAR data cleanup
-if(pingr::is_online())
+if(pingr::is_online()) {
+  source("../EDGAR data/helper functions.R")
   source("../EDGAR data/EDGAR data - consolidation.R")
+}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
@@ -214,7 +216,7 @@ yhoo_income_statements_quarterly <-
 #~~~~~~~~~~~~~~~~~~~~~~#
 # Cash Flow Statements
 #~~~~~~~~~~~~~~~~~~~~~~#
-file_yhoo_cf_yearly <- list.files(dir_yh1, pattern = "cash_flow_statements_yearly", full.names = TRUE) %>% max()
+file_yhoo_cf_yearly <- list.files(dir_yh1, pattern = "cash_flows_yearly", full.names = TRUE) %>% max()
 yhoo_cash_flow_statements_yearly <- 
     read_tibble(file_yhoo_cf_yearly) %>% 
     add_column(form = "cash_flow_statement") %>% 
@@ -222,7 +224,7 @@ yhoo_cash_flow_statements_yearly <-
     mutate(repurchase_of_stock = repurchase_of_stock * -1)
 
 
-file_yhoo_cf_quarterly <- list.files(dir_yh1, pattern = "cash_flow_statements_quarterly", full.names = TRUE) %>% max()
+file_yhoo_cf_quarterly <- list.files(dir_yh1, pattern = "cash_flows_quarterly", full.names = TRUE) %>% max()
 yhoo_cash_flow_statements_quarterly <- 
     read_tibble(file_yhoo_cf_quarterly) %>% 
     add_column(form = "cash_flow_statement") %>% 
@@ -262,7 +264,6 @@ factset_cash_flow_statements_yearly <-
     select(ticker, period, report_date, source, 
            total_cash_from_operating_activities, depreciation,
            issuance_of_stock, repurchase_of_stock)
-
 
 
 #-----------------------------------------------#
@@ -406,7 +407,6 @@ input_data_profiles <-
   read_tibble(input_data_profiles_file, date_format = "%m/%d/%Y") %>% 
   # Remove empty columns
   janitor::remove_empty(which = "cols")
-
 
 
 #--------------------------#
@@ -919,7 +919,6 @@ fwrite(bs_consolidated, paste0("C:/Users/user/Desktop/Aaron/R/Shiny apps/stock-a
 # Income Statements 
 #~~~~~~~~~~~~~~~~~~~#
 
-!!! ticker AHGP has filled values for revenue_1Y!!!!
 # Consolidate revenue
 revenue <-
   reduce(list(yhoo_income_statements_yearly %>% 
@@ -1659,8 +1658,11 @@ profile_data_consolidated <-
            str_replace(industry_simfin, "other", "unknown")) %>% 
   mutate(across(starts_with("industry_") | starts_with("sector_"),
     ~replace_na(.x, "unknown"))
-    )
-
+    ) %>% 
+  group_by(ticker) %>% 
+  fill(everything(), .direction = "up") %>% 
+  slice(1) %>% 
+  ungroup()
 
 
 if(profile_data_consolidated %>% count(ticker) %>% filter(n > 1) %>% nrow() > 0)
@@ -1711,7 +1713,7 @@ cf_consolidated <- map_df(cf_files, ~read_tibble(.x))
 
 
 # Shares
-ls_tibble_objects <- ls()[unlist(map(ls(), ~is_tibble(get(.x))))]
+# ls_tibble_objects <- ls()[unlist(map(ls(), ~is_tibble(get(.x))))]
 
 # objects_that_contain_shares <-  
 #   ls_tibble_objects %>% 
@@ -1779,17 +1781,14 @@ shares_basic <-
               profile_data_input_data_shares_basic_seeking_alpha)) %>% 
   as.data.table() %>% 
   drop_na() %>% 
-  unique() %>% 
-  add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
-  get_rounded_date() %>% 
-  as.data.table() %>% 
-  setorder(rounded_date, -n_vals) %>%
-  # Remove duplicate instances of a date for a given ticker
-  unique(by = c("ticker", "rounded_date")) %>% 
-  # filter(!duplicated(select(., ticker, rounded_date))) %>% 
-  select(-n_vals) %>% 
+  unique() %>%
+  get_rounded_date() %>%
+  group_by(ticker, rounded_date) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
   setorder(ticker, rounded_date) %>% 
   as_tibble()
+
 
 
 # Consolidate net_income fields from is and cf
@@ -1830,12 +1829,18 @@ fundamentals_consolidated <-
   filter(rowSums(is.na(select(., -c(ticker, report_date)))) != 
            ncol(select(., -c(ticker, report_date)))) %>%
   setorder(ticker, -report_date) %>% 
-  add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
+  # add_column(n_vals = rowSums(!is.na(select(., -c(ticker, report_date))))) %>%
   select(ticker, report_date, everything()) %>% 
-  setorder(report_date, -n_vals) %>%
+  # !!!!!!
+  # setorder(report_date, -n_vals) %>%
+  group_by(ticker, report_date) %>%
+  fill(everything(), .direction = "up") %>%
+  slice(1) %>% 
+  ungroup() %>% 
+  # !!!!!!!!!!!
   # Remove duplicate instances of a date for a given ticker
-  filter(!duplicated(select(., ticker, report_date))) %>% 
-  select(-n_vals) %>% 
+  # filter(!duplicated(select(., ticker, report_date))) %>% 
+  # select(-n_vals) %>% 
   setorder(ticker, report_date) %>% 
   as_tibble() %>% 
   filter(ticker != "") 
@@ -1970,24 +1975,23 @@ replace_na_values <- function(x) {
 }
 
 
-
-
 ## Slow! ~ 6 mins
 start9 <- Sys.time()
 ratios <- 
   combined_fundamentals_merged %>%
+  # filter(ticker %in% sample(ticker, 5)) %>%
   append_derived_values() %>% 
   append_price_stats() %>% 
   append_filled_values() %>% 
   append_cleaned_values() %>% 
   append_profitability_ratios() %>% 
-  select(!ends_with("_filled")) %>% 
   append_liquidity_solvency_ratios() %>% 
   append_manipulation_metrics() %>% 
   append_activity_ratios()
 end9 <- Sys.time(); end9 - start9  
 
 the_end <- Sys.time(); the_end - the_start # ~ 15 mins
+
 
 # Save
 fwrite(ratios, paste0("data/cleaned data/", "ratios ", 
@@ -2003,11 +2007,11 @@ ratios <- read_tibble(ratios_file)
 
 
 # WILL5000INDFC	Wilshire 5000 Total Market;Full Cap Index; Index; Daily; Not seasonally adjusted
-prices_from_FRED <- 
-  list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data",
-             pattern = "Prices from FRED", full.names = TRUE) %>% max()
-index_WILL5000 <- read_tibble(prices_from_FRED) %>% 
-  filter(symbol == "WILL5000INDFC")
+# prices_from_FRED <- 
+#   list.files("C:/Users/user/Desktop/Aaron/R/Projects/Fundamentals-Data/data",
+#              pattern = "Prices from FRED", full.names = TRUE) %>% max()
+# index_WILL5000 <- read_tibble(prices_from_FRED) %>% 
+#   filter(symbol == "WILL5000INDFC")
 
 # !!! Get total market cap data (Couldn't find online)
 
@@ -2021,13 +2025,28 @@ ratios_w_market_caps <-
   mutate(total_market_cap = na_if(total_market_cap, 0)) %>% 
   distinct()
 
+SP500TR <- read_tibble("data/SP500TR.csv")
+
+SP500TR_return <- 
+  SP500TR %>% 
+  fill(close, adjusted, .direction = "down") %>% 
+  slice(endpoints(date, on = "months")) %>% 
+  mutate(SP500TR_return_1M = adjusted / lag(adjusted, 1) - 1) %>% 
+  select(report_date = date, SP500TR_return_1M) %>% 
+  drop_na() %>% 
+  mutate(report_date = round_date(report_date, unit = "month") - days(1))
+
+ratios_w_market_data <-
+  ratios_w_market_caps %>% 
+  left_join(SP500TR_return)
+
 profile_data_final_file <- 
   list.files(paste0(dir_data, "data/cleaned data"), 
              pattern = "^profile_data_final", full.names = TRUE) %>% max()
 profile_data <- read_tibble(profile_data_final_file)
 
 ratios_w_profile_data <-
-  ratios_w_market_caps %>% 
+  ratios_w_market_data %>% 
   left_join(profile_data) %>%
   group_by(ticker) %>% 
   fill(starts_with("industry_") | starts_with("sector_"),
@@ -2131,8 +2150,10 @@ ratios_final <-
 #   mutate(across(where(is.character), ~na_if(.x, ""))) %>% 
 #   fill(name_edgar, .direction = "downup") %>% 
 #   as.data.table() %>% unique() %>% as_tibble()
+ratios_final %>% colnames() %>% sort()
 
-# Save to this project's data directory
+
+# Save (SLOW !!)
 ratios_final %>%
   mutate(file_name = industry_yhoo) %>%
   group_by(file_name) %>% 
@@ -2159,38 +2180,42 @@ fwrite(profiles_final,
 
 
 
+
+
+
 # source("helper functions.R")
-ratios_final_files <-
-  list.files(paste0(dir_data, "data/cleaned data/by industry"), 
-             pattern = "ratios - ", full.names = TRUE)
-ratios_final <- ratios_final_files %>% 
-  map_df(read_tibble)
+# 
+# ratios_final_files <-
+#   list.files(paste0(dir_data, "data/cleaned data/by industry"), 
+#              pattern = "ratios - ", full.names = TRUE)
+# ratios_final <- ratios_final_files %>% 
+#   map_df(read_tibble)
 
 
 
-plot <-
-      ratios_final %>% 
-      summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
-      pivot_longer(-ticker) %>% 
-      select(-ticker) %>% 
-      arrange(value) %>% 
-      mutate(name = str_trunc(name, 35)) %>% 
-      mutate(name = snakecase::to_title_case(name)) %>% 
-      ggplot(aes(value, fct_reorder(name, value), color = value,
-                 text = paste(
-                       name, "\n",
-                       scales::percent_format(accuracy = 1)(value),
-                       sep = ""
-                 ))) +
-      # geom_vline(aes(xintercept = value))
-      geom_point(size = 2, show.legend = FALSE) +
-      labs(y = "", x = "% Missing") +
-      scale_x_continuous(breaks = seq(0, 1.0, by = 0.1), labels = scales::percent_format(accuracy = 1)) +
-      scale_color_gradient(high = "red", low = "midnightblue") +
-      theme_light() +
-      theme(panel.grid.major.y = element_blank())
+# plot <-
+#       ratios_final_filled %>% 
+#       summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
+#       pivot_longer(-ticker) %>% 
+#       select(-ticker) %>% 
+#       arrange(value) %>% 
+#       mutate(name = str_trunc(name, 35)) %>% 
+#       mutate(name = snakecase::to_title_case(name)) %>% 
+#       ggplot(aes(value, fct_reorder(name, value), color = value,
+#                  text = paste(
+#                        name, "\n",
+#                        scales::percent_format(accuracy = 1)(value),
+#                        sep = ""
+#                  ))) +
+#       # geom_vline(aes(xintercept = value))
+#       geom_point(size = 2, show.legend = FALSE) +
+#       labs(y = "", x = "% Missing") +
+#       scale_x_continuous(breaks = seq(0, 1.0, by = 0.1), labels = scales::percent_format(accuracy = 1)) +
+#       scale_color_gradient(high = "red", low = "midnightblue") +
+#       theme_light() +
+#       theme(panel.grid.major.y = element_blank())
       
-plotly::ggplotly(plot, tooltip = "text")
+# plotly::ggplotly(plot, tooltip = "text")
 
 
 # skimr::skim(ratios_final)
@@ -2200,69 +2225,130 @@ plotly::ggplotly(plot, tooltip = "text")
 #   select(contains("sector") | contains("industry")) %>% 
 #   colnames()
 
-name_sector_industry_fields <- 
-  ratios_final %>%
-  colnames() %>% 
-  str_subset("^sector_|^industry_|^name_")
+# name_sector_industry_fields <- 
+#   ratios_final %>%
+#   colnames() %>% 
+#   str_subset("^sector_|^industry_|^name_")
 
 
-fields_to_use <-
-  ratios_final %>%
-  select(!all_of(name_sector_industry_fields)) %>% 
-  summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
-  gather() %>% 
-  arrange(value) %>%
-  filter(value < 0.8) %>% 
-  pull(key) %>%
-  unique()
-fields_to_use
-  # .[!. %in% c("working_capital_pct_chg_1Y", "name_edgar", "industry_edgar",
-  #             "industry_detail_edgar", "name_simfin", "sector_simfin",
-  #             "industry_simfin", "total_stockholder_equity")]
+# ratios_final_filled <-
+#   ratios_final %>% 
+#   # filter(ticker == "BCC") %>% 
+#   group_by(ticker) %>% 
+#   arrange(ticker, report_date) %>%
+#   mutate(across(everything(), ~fill_na_two_periods_max(.x))) %>% 
+#   ungroup()
+
+# Save
+# fwrite(ratios_final_filled, paste0("data/cleaned data/", "ratios_final_filled ", 
+#                       str_replace_all(Sys.Date(), "-", "_"), ".csv"))
+
+
+
+# source("helper functions.R")
+# ratios_final_filled_file <- list.files("data/cleaned data", 
+#                                        pattern = "ratios_final_filled",
+#                           full.names = TRUE) %>% max()
+# ratios_final_filled <- read_tibble(ratios_final_filled_file)
+
+
+
+
+# req_fields <-
+#   c("ticker", "report_date", 
+#     "revenue_1Y", "operating_income_loss_1Y",
+#     "total_assets", "total_liabilities",
+#     "cash_and_short_term_investments")
+
+# ticker_nas <-
+#   ratios_final %>%
+#   select(!all_of(name_sector_industry_fields)) %>% 
+#   group_by(ticker) %>% 
+#   arrange(ticker, report_date) %>% 
+#   # Remove trailing and leading NAs in the adjusted column 
+#   #  (entirely removes some tickers!)
+#   trim_nas(., adjusted) %>% 
+#   ungroup() %>% 
+#   group_by(ticker) %>% 
+#   summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
+#   ungroup() 
+
+# tickers_to_use <-
+#   ticker_nas %>% 
+#   select(all_of(req_fields)) %>% 
+#   select(-ticker, -report_date) %>% 
+#   {rowMeans(.) < 0.7} %>% 
+#   which() %>% 
+#   pull(ticker_nas, ticker)[.]
+
+
+# fields_to_use <-
+#   ratios_final %>%
+#   filter(ticker %in% tickers_to_use) %>% 
+#   select(!all_of(name_sector_industry_fields)) %>% 
+#   group_by(ticker) %>% 
+#   arrange(ticker, report_date) %>% 
+#   # Remove trailing and leading NAs in the adjusted column 
+#   #  (entirely removes some tickers!)
+#   trim_nas(., adjusted) %>% 
+#   ungroup() %>% 
+#   summarize(across(everything(), ~sum(is.na(.x)) / n())) %>% 
+#   gather() %>% 
+#   arrange(value) %>%
+#   filter(value < 0.7) %>%
+#   pull(key) %>%
+#   unique()
+# fields_to_use
+
+
+# data_partially_complete <-
+#   ratios_final %>% 
+#   filter(ticker %in% tickers_to_use) %>% 
+#   select(all_of(fields_to_use))
 
 
 
 
 # 5 Years
-ratios_complete_set_5y <-
-  get_complete_series(data = ratios_final, 
-                      years = 5,
-                      fields = fields_to_use) %>% 
-  left_join(ratios_final %>% 
-              select(ticker, report_date, all_of(name_sector_industry_fields)))
-ratios_complete_set_5y %>% distinct(ticker) # 257 --> 1,997 tickers --> 312
-ratios_complete_set_5y %>% 
-  summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
+# ratios_complete_set_5y <-
+#   get_complete_series(data = data_partially_complete, 
+#                       years = 5,
+#                       fields = fields_to_use) %>% 
+#   left_join(ratios_final %>% 
+#               select(ticker, report_date, all_of(name_sector_industry_fields)))
+# ratios_complete_set_5y %>% distinct(ticker) # 257 --> 1,997 tickers --> 312
+# ratios_complete_set_5y %>% 
+#   summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
 
 # 8 Years
-ratios_complete_set_8y <-
-      get_complete_series(data = ratios_final, 
-                          years = 8,
-                          fields = fields_to_use)
-ratios_complete_set_8y %>% distinct(ticker) # 159 --> 1,475 tickers --> 193
-ratios_complete_set_8y %>% 
-  summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
+# ratios_complete_set_8y <-
+#       get_complete_series(data = data_partially_complete, 
+#                           years = 8,
+#                           fields = fields_to_use)
+# ratios_complete_set_8y %>% distinct(ticker) # 159 --> 1,475 tickers --> 193
+# ratios_complete_set_8y %>% 
+#   summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
 
 # 10 Years
-ratios_complete_set_10y <-
-  get_complete_series(data = ratios_final, 
-                      years = 10,
-                      fields = fields_to_use)
-ratios_complete_set_10y %>% distinct(ticker) # 32 --> 1,290 tickers --> 76
-ratios_complete_set_10y %>% 
-  summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
+# ratios_complete_set_10y <-
+#   get_complete_series(data = data_partially_complete, 
+#                       years = 10,
+#                       fields = fields_to_use)
+# ratios_complete_set_10y %>% distinct(ticker) # 32 --> 1,290 tickers --> 76
+# ratios_complete_set_10y %>% 
+#   summarize(across(report_date, list(start = min, end = max), .names = "{.fn}"))
 
 
 # Save
-fwrite(ratios_complete_set_5y, 
-       paste0(dir_data, "data/cleaned data/", "ratios_complete_set_5y (",
-              str_replace_all(Sys.Date(), "-", " "), ")"))
-fwrite(ratios_complete_set_8y, 
-       paste0(dir_data, "data/cleaned data/", "ratios_complete_set_8y (",
-              str_replace_all(Sys.Date(), "-", " "), ")"))
-fwrite(ratios_complete_set_10y, 
-       paste0(dir_data, "data/cleaned data/", "ratios_complete_set_10y (",
-              str_replace_all(Sys.Date(), "-", " "), ")"))
+# fwrite(ratios_complete_set_5y, 
+#        paste0(dir_data, "data/cleaned data/", "ratios_complete_set_5y (",
+#               str_replace_all(Sys.Date(), "-", " "), ")"))
+# fwrite(ratios_complete_set_8y, 
+#        paste0(dir_data, "data/cleaned data/", "ratios_complete_set_8y (",
+#               str_replace_all(Sys.Date(), "-", " "), ")"))
+# fwrite(ratios_complete_set_10y, 
+#        paste0(dir_data, "data/cleaned data/", "ratios_complete_set_10y (",
+#               str_replace_all(Sys.Date(), "-", " "), ")"))
 
 
 
@@ -2278,7 +2364,6 @@ ratios_final_files <-
              pattern = "ratios - ", full.names = TRUE)
 ratios_final <- ratios_final_files %>% 
   map_df(read_tibble)
-
 
 
 # ratios_final %>% filter(ticker == "SOFI") %>% pull(industry_yhoo)
